@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64;AnyCPU</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SurfaceFanControl.Core\SurfaceFanControl.Core.csproj" />
+  </ItemGroup>
+
+</Project>

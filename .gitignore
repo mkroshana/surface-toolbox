@@ -1,0 +1,31 @@
+## Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## User specific
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## Local App Settings
+stock_settings_backup.json

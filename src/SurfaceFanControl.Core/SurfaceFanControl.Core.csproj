@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64;AnyCPU</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Management" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>
