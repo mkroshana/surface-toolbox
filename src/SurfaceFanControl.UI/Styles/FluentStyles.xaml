@@ -230,6 +230,81 @@
         </Setter>
     </Style>
 
+    <!-- Sidebar Navigation: a TabControl laid out as a left-hand page list, in the manner of
+         the Windows 11 Settings app. The selected item gets a filled row and an accent bar. -->
+    <Style x:Key="SidebarTabControl" TargetType="TabControl">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0"
+                                Width="188"
+                                Margin="0,0,12,10"
+                                Padding="6"
+                                Background="{StaticResource CardBackground}"
+                                BorderBrush="{StaticResource CardBorder}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                            <StackPanel IsItemsHost="True"
+                                        KeyboardNavigation.TabNavigation="Once"
+                                        KeyboardNavigation.DirectionalNavigation="Cycle" />
+                        </Border>
+                        <!-- The name is part of TabControl's template contract: without it the page's
+                             controls are missing from UI Automation and screen readers. -->
+                        <ContentPresenter x:Name="PART_SelectedContentHost" Grid.Column="1" ContentSource="SelectedContent" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A sidebar entry. Set Header to the page name and Tag to the page's icon geometry. -->
+    <Style x:Key="SidebarTabItem" TargetType="TabItem">
+        <Setter Property="Foreground" Value="{StaticResource TextSecondary}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Border x:Name="Row" Background="Transparent" CornerRadius="6" Padding="6,9,10,9" Margin="0,0,0,2">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Rectangle x:Name="SelectionBar" Grid.Column="0" Width="3" Height="16" RadiusX="1.5" RadiusY="1.5"
+                                       Fill="{StaticResource AccentBluePrimary}" Visibility="Hidden" VerticalAlignment="Center" Margin="0,0,9,0" />
+                            <Path Grid.Column="1"
+                                  Data="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                  Fill="{TemplateBinding Foreground}"
+                                  Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <ContentPresenter Grid.Column="2" ContentSource="Header" VerticalAlignment="Center" TextElement.FontSize="13" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Row" Property="Background" Value="{StaticResource CardBackgroundHover}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Row" Property="Background" Value="#32323D" />
+                            <Setter TargetName="SelectionBar" Property="Visibility" Value="Visible" />
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Windows 11 Modern Dark ScrollBar Style -->
     <Style x:Key="FluentScrollThumb" TargetType="{x:Type Thumb}">
         <Setter Property="OverridesDefaultStyle" Value="true" />
