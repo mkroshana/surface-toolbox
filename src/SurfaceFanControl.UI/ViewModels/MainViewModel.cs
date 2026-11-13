@@ -305,6 +305,9 @@ namespace SurfaceFanControl.UI.ViewModels
         /// <summary>Backs the Display page; it only polls while that page is on screen.</summary>
         public DisplayViewModel Display { get; } = new DisplayViewModel();
 
+        /// <summary>Backs the History page; every monitor reading is recorded into it.</summary>
+        public HistoryViewModel History { get; } = new HistoryViewModel();
+
         public ICommand SelectQuietCommand { get; }
         public ICommand SelectBalancedCommand { get; }
         public ICommand SelectBetterPerformanceCommand { get; }
@@ -480,6 +483,7 @@ namespace SurfaceFanControl.UI.ViewModels
                 Pl1Watts = snapshot.Pl1Watts;
                 Pl2Watts = snapshot.Pl2Watts;
                 IsDirectSamAvailable = snapshot.IsDirectSamAvailable;
+                History.Record(snapshot);
 
                 UpdateSourceInUse(snapshot.IsPluggedIn ? PowerSource.PluggedIn : PowerSource.Battery);
 
