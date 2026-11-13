@@ -314,6 +314,9 @@ namespace SurfaceFanControl.UI.ViewModels
         /// <summary>Backs the Diagnostics page.</summary>
         public DiagnosticsViewModel Diagnostics { get; } = new DiagnosticsViewModel();
 
+        /// <summary>Backs the Settings page.</summary>
+        public SettingsViewModel Settings { get; } = new SettingsViewModel();
+
         public ICommand SelectQuietCommand { get; }
         public ICommand SelectBalancedCommand { get; }
         public ICommand SelectBetterPerformanceCommand { get; }

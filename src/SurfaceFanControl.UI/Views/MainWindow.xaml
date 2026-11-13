@@ -76,6 +76,9 @@
             <TabItem Style="{StaticResource SidebarTabItem}" Header="Diagnostics" Tag="{StaticResource ReportGeometry}">
                 <views:DiagnosticsPage DataContext="{Binding Diagnostics}" />
             </TabItem>
+            <TabItem Style="{StaticResource SidebarTabItem}" Header="Settings" Tag="{StaticResource SettingsGeometry}">
+                <views:SettingsPage DataContext="{Binding Settings}" />
+            </TabItem>
         </TabControl>
 
         <!-- 2. Footer with Status and Clean Developer Links -->

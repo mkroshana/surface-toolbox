@@ -77,8 +77,12 @@ namespace SurfaceFanControl.UI
 
             _trayManager = new TrayIconManager(_viewModel, _mainWindow);
 
-            // Show main window on first launch
-            _mainWindow.Show();
+            // Started by the sign-in task: stay in the tray. Otherwise open the dashboard.
+            bool startInTray = Array.Exists(e.Args, arg => string.Equals(arg, Services.AutostartService.TrayArgument, StringComparison.OrdinalIgnoreCase));
+            if (!startInTray)
+            {
+                _mainWindow.Show();
+            }
         }
 
         protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
