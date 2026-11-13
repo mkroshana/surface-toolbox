@@ -61,6 +61,9 @@
             <TabItem Style="{StaticResource SidebarTabItem}" Header="Thermal &amp; Power" Tag="{StaticResource ThermometerGeometry}">
                 <views:ThermalPowerPage />
             </TabItem>
+            <TabItem Style="{StaticResource SidebarTabItem}" Header="Battery" Tag="{StaticResource BatteryGeometry}">
+                <views:BatteryPage DataContext="{Binding Battery}" />
+            </TabItem>
         </TabControl>
 
         <!-- 2. Footer with Status and Clean Developer Links -->

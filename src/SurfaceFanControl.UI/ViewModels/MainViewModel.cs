@@ -253,6 +253,9 @@ namespace SurfaceFanControl.UI.ViewModels
 
         public ObservableCollection<ThermalZoneInfo> Zones { get; }
 
+        /// <summary>Backs the Battery page; it only polls while that page is on screen.</summary>
+        public BatteryViewModel Battery { get; } = new BatteryViewModel();
+
         public ICommand SelectQuietCommand { get; }
         public ICommand SelectBalancedCommand { get; }
         public ICommand SelectBetterPerformanceCommand { get; }
@@ -483,6 +486,7 @@ namespace SurfaceFanControl.UI.ViewModels
             _disposed = true;
             _thermalMonitor.SnapshotUpdated -= OnSnapshotUpdated;
             _profileManager.ActiveProfileChanged -= OnProfileChanged;
+            Battery.Dispose();
             _thermalMonitor.Dispose();
             _powerManager.Dispose();
         }
