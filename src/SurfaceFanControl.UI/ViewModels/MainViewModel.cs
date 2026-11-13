@@ -400,11 +400,9 @@ namespace SurfaceFanControl.UI.ViewModels
         {
             try
             {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = uri,
-                    UseShellExecute = true
-                });
+                // Through the desktop shell, so the browser or mail app does not inherit this
+                // app's administrator rights.
+                Services.ShellLauncher.OpenUnelevated(uri);
             }
             catch (Exception ex)
             {
