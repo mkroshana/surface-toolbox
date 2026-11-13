@@ -122,10 +122,30 @@
 
         <!-- Power Mode Section (power only; fan speed is set separately in the bar below) -->
         <StackPanel Grid.Row="1" Margin="0,0,0,8">
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                <TextBlock Text="Power Mode" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" />
-                <TextBlock Text=" • Power only. Fan speed is set separately below." FontSize="12" Foreground="{StaticResource TextTertiary}" />
-            </StackPanel>
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Power Mode" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" />
+                    <TextBlock Text=" • Power only, one mode per power source. Fan speed is set below." FontSize="12" Foreground="{StaticResource TextTertiary}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+
+                <!-- Which power source the four cards show and change. Windows switches between the
+                     two modes by itself when the device is plugged in or unplugged. -->
+                <Border Grid.Column="1" Background="{StaticResource SubCardBackground}" BorderBrush="{StaticResource SubCardBorder}" BorderThickness="1" CornerRadius="7" Padding="2" Margin="12,0,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton Style="{StaticResource SegmentRadioButton}" GroupName="PowerModeSource"
+                                     Content="{Binding PluggedInSourceLabel}"
+                                     IsChecked="{Binding IsEditingPluggedIn, Mode=TwoWay}" />
+                        <RadioButton Style="{StaticResource SegmentRadioButton}" GroupName="PowerModeSource"
+                                     Content="{Binding BatterySourceLabel}"
+                                     IsChecked="{Binding IsEditingBattery, Mode=TwoWay}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
 
             <UniformGrid Columns="4">
                 <!-- Quiet -->

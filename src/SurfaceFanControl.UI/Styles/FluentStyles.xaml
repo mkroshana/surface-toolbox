@@ -235,6 +235,33 @@
         </Setter>
     </Style>
 
+    <!-- Segmented Choice: RadioButtons placed side by side inside a bordered track; the checked
+         one is filled with the accent colour. Used to pick between a small number of views. -->
+    <Style x:Key="SegmentRadioButton" TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{StaticResource TextSecondary}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Segment" Background="Transparent" CornerRadius="5" Padding="12,5">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Segment" Property="Background" Value="{StaticResource CardBackgroundHover}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Segment" Property="Background" Value="{StaticResource AccentBluePrimary}" />
+                            <Setter Property="Foreground" Value="#FFFFFF" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Sidebar Navigation: a TabControl laid out as a left-hand page list, in the manner of
          the Windows 11 Settings app. The selected item gets a filled row and an accent bar. -->
     <Style x:Key="SidebarTabControl" TargetType="TabControl">

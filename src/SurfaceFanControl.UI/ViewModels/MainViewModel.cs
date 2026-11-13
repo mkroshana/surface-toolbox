@@ -33,6 +33,8 @@ namespace SurfaceFanControl.UI.ViewModels
         private string _powerSourceText = "Detecting...";
         private string _statusMessage;
         private CoolingProfile _activeProfile;
+        private PowerSource _sourceInUse;
+        private PowerSource _editingSource;
         private bool _isStockRestored;
         private volatile bool _disposed;
 
@@ -46,6 +48,8 @@ namespace SurfaceFanControl.UI.ViewModels
             _profileManager = new ProfileManager(_powerManager);
             _deviceInfo = deviceInfo ?? SurfaceDeviceDetector.Detect();
 
+            _sourceInUse = _powerManager.CurrentPowerSource;
+            _editingSource = _sourceInUse;
             _activeProfile = _profileManager.ActiveProfile;
             _isDirectSamAvailable = _powerManager.IsDirectSamAvailable;
             _targetFanRpm = _powerManager.ActiveTargetRpm;
@@ -53,10 +57,10 @@ namespace SurfaceFanControl.UI.ViewModels
                 ? "Direct SAM Hardware Fan Control Active"
                 : "SMF Overlay Control Active (Run as Administrator for Direct RPM Control)";
 
-            SelectQuietCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.Quiet));
-            SelectBalancedCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.Balanced));
-            SelectBetterPerformanceCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.BetterPerformance));
-            SelectBestPerformanceCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.BestPerformance));
+            SelectQuietCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.Quiet, _editingSource));
+            SelectBalancedCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.Balanced, _editingSource));
+            SelectBetterPerformanceCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.BetterPerformance, _editingSource));
+            SelectBestPerformanceCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.BestPerformance, _editingSource));
             ApplyManualRpmCommand = new RelayCommand(_ => ApplyManualRpm());
             ResetFanOnlyCommand = new RelayCommand(_ => ResetFanOnly());
             RestoreStockCommand = new RelayCommand(_ => RestoreStock());
@@ -225,25 +229,67 @@ namespace SurfaceFanControl.UI.ViewModels
 
         public string HardwareModeBadgeText => _isDirectSamAvailable ? "SAM Direct + SMF" : "SMF Overlay Only";
 
+        /// <summary>The power mode of the power source in use; shown in the header badge and tray.</summary>
         public CoolingProfile ActiveProfile
         {
             get => _activeProfile;
-            set
-            {
-                if (SetField(ref _activeProfile, value))
-                {
-                    OnPropertyChanged(nameof(IsQuietActive));
-                    OnPropertyChanged(nameof(IsBalancedActive));
-                    OnPropertyChanged(nameof(IsBetterPerformanceActive));
-                    OnPropertyChanged(nameof(IsBestPerformanceActive));
-                }
-            }
+            set => SetField(ref _activeProfile, value);
         }
 
-        public bool IsQuietActive => ActiveProfile.Type == CoolingProfileType.Quiet;
-        public bool IsBalancedActive => ActiveProfile.Type == CoolingProfileType.Balanced || ActiveProfile.Type == CoolingProfileType.StockReset;
-        public bool IsBetterPerformanceActive => ActiveProfile.Type == CoolingProfileType.BetterPerformance;
-        public bool IsBestPerformanceActive => ActiveProfile.Type == CoolingProfileType.BestPerformance;
+        // Windows keeps one power mode for "plugged in" and one for "on battery". The Power Mode
+        // cards show and change the mode of whichever source is selected here.
+        public bool IsEditingPluggedIn
+        {
+            get => _editingSource == PowerSource.PluggedIn;
+            set { if (value) SetEditingSource(PowerSource.PluggedIn); }
+        }
+
+        public bool IsEditingBattery
+        {
+            get => _editingSource == PowerSource.Battery;
+            set { if (value) SetEditingSource(PowerSource.Battery); }
+        }
+
+        public string PluggedInSourceLabel => _sourceInUse == PowerSource.PluggedIn ? "Plugged In (In Use)" : "Plugged In";
+        public string BatterySourceLabel => _sourceInUse == PowerSource.Battery ? "On Battery (In Use)" : "On Battery";
+
+        private CoolingProfile EditingProfile => _profileManager.GetActiveProfile(_editingSource);
+
+        public bool IsQuietActive => EditingProfile.Type == CoolingProfileType.Quiet;
+        public bool IsBalancedActive => EditingProfile.Type == CoolingProfileType.Balanced || EditingProfile.Type == CoolingProfileType.StockReset;
+        public bool IsBetterPerformanceActive => EditingProfile.Type == CoolingProfileType.BetterPerformance;
+        public bool IsBestPerformanceActive => EditingProfile.Type == CoolingProfileType.BestPerformance;
+
+        private void SetEditingSource(PowerSource source)
+        {
+            if (_editingSource == source) return;
+            _editingSource = source;
+            OnPropertyChanged(nameof(IsEditingPluggedIn));
+            OnPropertyChanged(nameof(IsEditingBattery));
+            RaiseModeFlagsChanged();
+        }
+
+        private void RaiseModeFlagsChanged()
+        {
+            OnPropertyChanged(nameof(IsQuietActive));
+            OnPropertyChanged(nameof(IsBalancedActive));
+            OnPropertyChanged(nameof(IsBetterPerformanceActive));
+            OnPropertyChanged(nameof(IsBestPerformanceActive));
+        }
+
+        // Called on every reading. When the device is plugged in or unplugged, Windows switches
+        // to the other source's power mode by itself; follow it in the header and the selector.
+        private void UpdateSourceInUse(PowerSource source)
+        {
+            if (_sourceInUse == source) return;
+            _sourceInUse = source;
+            OnPropertyChanged(nameof(PluggedInSourceLabel));
+            OnPropertyChanged(nameof(BatterySourceLabel));
+            ActiveProfile = _profileManager.GetActiveProfile(source);
+            SetEditingSource(source);
+        }
+
+        private static string DescribeSource(PowerSource source) => source == PowerSource.PluggedIn ? "Plugged In" : "On Battery";
 
         public bool IsStockRestored
         {
@@ -268,17 +314,24 @@ namespace SurfaceFanControl.UI.ViewModels
 
         public ProfileManager ProfileManager => _profileManager;
 
-        // Changes the power mode only. A fan speed the user has set is left as it is.
+        // Changes the power mode of the power source in use (tray menu).
         public void SetProfile(CoolingProfileType type)
         {
-            bool ok = _profileManager.SetProfile(type);
+            SetProfile(type, _powerManager.CurrentPowerSource);
+        }
+
+        // Changes the power mode of one power source only. The other source's mode and any fan
+        // speed the user has set are left as they are.
+        public void SetProfile(CoolingProfileType type, PowerSource source)
+        {
+            bool ok = _profileManager.SetProfile(type, source);
             if (ok)
             {
-                var active = _profileManager.ActiveProfile;
+                var applied = _profileManager.GetActiveProfile(source);
                 string? failure = DescribeLastFailure();
                 StatusMessage = failure != null
-                    ? $"{active.Name} only partly applied: {failure}."
-                    : $"Power Mode Set to {active.Name} (fan speed unchanged)";
+                    ? $"{applied.Name} only partly applied: {failure}."
+                    : $"{DescribeSource(source)} Power Mode Set to {applied.Name} (fan speed unchanged)";
                 IsStockRestored = false;
             }
             else
@@ -425,6 +478,8 @@ namespace SurfaceFanControl.UI.ViewModels
                 Pl2Watts = snapshot.Pl2Watts;
                 IsDirectSamAvailable = snapshot.IsDirectSamAvailable;
 
+                UpdateSourceInUse(snapshot.IsPluggedIn ? PowerSource.PluggedIn : PowerSource.Battery);
+
                 PowerSourceText = snapshot.IsPluggedIn
                     ? $"Plugged In (AC) • {snapshot.BatteryPercentage}%"
                     : $"On Battery (DC) • {snapshot.BatteryPercentage}%";
@@ -448,22 +503,26 @@ namespace SurfaceFanControl.UI.ViewModels
             }, DispatcherPriority.Background);
         }
 
-        private void OnProfileChanged(CoolingProfile profile)
+        private void OnProfileChanged(CoolingProfile profile, PowerSource source)
         {
+            void Apply()
+            {
+                if (_disposed) return;
+                if (source == _powerManager.CurrentPowerSource)
+                {
+                    ActiveProfile = profile;
+                }
+                RaiseModeFlagsChanged();
+            }
+
             var dispatcher = System.Windows.Application.Current?.Dispatcher;
             if (dispatcher != null && !dispatcher.CheckAccess())
             {
-                dispatcher.InvokeAsync(() =>
-                {
-                    if (_disposed) return;
-                    ActiveProfile = profile;
-                    TargetFanRpm = _powerManager.ActiveTargetRpm;
-                });
+                dispatcher.InvokeAsync(Apply);
             }
             else
             {
-                ActiveProfile = profile;
-                TargetFanRpm = _powerManager.ActiveTargetRpm;
+                Apply();
             }
         }
 

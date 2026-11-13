@@ -6,16 +6,19 @@ using SurfaceFanControl.Core.Hardware;
 namespace SurfaceFanControl.Core.Profiles
 {
     /// <summary>
-    /// Tracks the active power mode and forwards fan requests. The two are independent: choosing
-    /// a power mode leaves the fan speed alone, and setting a fan speed leaves the power mode alone.
+    /// Tracks the power mode of each power source and forwards fan requests. Windows keeps one
+    /// power mode for "plugged in" and another for "on battery" and switches between them itself.
+    /// Power mode and fan speed are independent: choosing a power mode leaves the fan speed
+    /// alone, and setting a fan speed leaves the power mode alone.
     /// </summary>
     public class ProfileManager
     {
         private readonly SurfacePowerManager _powerManager;
         private readonly Dictionary<CoolingProfileType, CoolingProfile> _profiles;
-        private CoolingProfile _activeProfile;
+        private readonly Dictionary<PowerSource, CoolingProfile> _activeProfiles = new();
 
-        public event Action<CoolingProfile>? ActiveProfileChanged;
+        /// <summary>Raised when a source's power mode changes, with the source it changed for.</summary>
+        public event Action<CoolingProfile, PowerSource>? ActiveProfileChanged;
 
         public ProfileManager(SurfacePowerManager powerManager)
         {
@@ -42,37 +45,44 @@ namespace SurfaceFanControl.Core.Profiles
                 bestPerformance
             };
 
-            // Start from the power mode Windows is actually in.
-            Guid overlay = _powerManager.GetEffectiveOverlayGuid();
-            if (overlay == NativePower.GUID_OVERLAY_BEST_POWER_EFFICIENCY)
-            {
-                _activeProfile = quiet;
-            }
-            else if (overlay == NativePower.GUID_OVERLAY_BETTER_PERFORMANCE)
-            {
-                _activeProfile = betterPerformance;
-            }
-            else if (overlay == NativePower.GUID_OVERLAY_BEST_PERFORMANCE)
-            {
-                _activeProfile = bestPerformance;
-            }
-            else
-            {
-                _activeProfile = balanced;
-            }
+            // Start from the power modes Windows actually has for each source.
+            _activeProfiles[PowerSource.PluggedIn] = ProfileForOverlay(_powerManager.GetConfiguredOverlay(PowerSource.PluggedIn));
+            _activeProfiles[PowerSource.Battery] = ProfileForOverlay(_powerManager.GetConfiguredOverlay(PowerSource.Battery));
 
-            _powerManager.ProfileApplied += (p) =>
+            _powerManager.ProfileApplied += (profile, source) =>
             {
-                _activeProfile = p;
-                ActiveProfileChanged?.Invoke(p);
+                _activeProfiles[source] = profile;
+                ActiveProfileChanged?.Invoke(profile, source);
             };
         }
 
         public IReadOnlyList<CoolingProfile> AvailableProfiles { get; }
 
-        public CoolingProfile ActiveProfile => _activeProfile;
+        /// <summary>The power mode of the power source in use right now.</summary>
+        public CoolingProfile ActiveProfile => _activeProfiles[_powerManager.CurrentPowerSource];
 
+        public CoolingProfile GetActiveProfile(PowerSource source) => _activeProfiles[source];
+
+        // An unreadable mode (older Windows, source not in use) is shown as Balanced.
+        private CoolingProfile ProfileForOverlay(Guid? overlay)
+        {
+            if (overlay == NativePower.GUID_OVERLAY_BEST_POWER_EFFICIENCY)
+                return _profiles[CoolingProfileType.Quiet];
+            if (overlay == NativePower.GUID_OVERLAY_BETTER_PERFORMANCE)
+                return _profiles[CoolingProfileType.BetterPerformance];
+            if (overlay == NativePower.GUID_OVERLAY_BEST_PERFORMANCE)
+                return _profiles[CoolingProfileType.BestPerformance];
+            return _profiles[CoolingProfileType.Balanced];
+        }
+
+        /// <summary>Sets the power mode of the power source in use.</summary>
         public bool SetProfile(CoolingProfileType type)
+        {
+            return SetProfile(type, _powerManager.CurrentPowerSource);
+        }
+
+        /// <summary>Sets the power mode of one power source, leaving the other as it is.</summary>
+        public bool SetProfile(CoolingProfileType type, PowerSource source)
         {
             if (type == CoolingProfileType.StockReset)
             {
@@ -82,7 +92,7 @@ namespace SurfaceFanControl.Core.Profiles
             var target = AvailableProfiles.FirstOrDefault(p => p.Type == type);
             if (target != null)
             {
-                return _powerManager.ApplyProfile(target);
+                return _powerManager.ApplyProfile(target, source);
             }
 
             return false;

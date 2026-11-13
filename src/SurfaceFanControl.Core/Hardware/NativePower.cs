@@ -3,8 +3,68 @@ using System.Runtime.InteropServices;
 
 namespace SurfaceFanControl.Core.Hardware
 {
+    /// <summary>The power source a power mode applies to. Windows keeps a separate mode for each.</summary>
+    public enum PowerSource
+    {
+        PluggedIn,
+        Battery
+    }
+
     public static class NativePower
     {
+        public const uint ERROR_NOT_SUPPORTED = 50;
+
+        // Per-source power mode ("Plugged in" / "On battery" in Windows Settings). These exports are
+        // not in the public SDK headers; they were found in powrprof.dll on Windows 11 build 26300
+        // and checked there: each reads or writes only its own source's mode. Older builds may
+        // lack them, so every call goes through the Try* helpers below.
+        [DllImport("powrprof.dll")]
+        private static extern uint PowerGetUserConfiguredACPowerMode(out Guid PowerModeGuid);
+
+        [DllImport("powrprof.dll")]
+        private static extern uint PowerGetUserConfiguredDCPowerMode(out Guid PowerModeGuid);
+
+        [DllImport("powrprof.dll")]
+        private static extern uint PowerSetUserConfiguredACPowerMode(ref Guid PowerModeGuid);
+
+        [DllImport("powrprof.dll")]
+        private static extern uint PowerSetUserConfiguredDCPowerMode(ref Guid PowerModeGuid);
+
+        /// <summary>Reads the power mode Windows will use on the given source. False if this build has no per-source call.</summary>
+        public static bool TryGetConfiguredPowerMode(PowerSource source, out Guid mode)
+        {
+            mode = Guid.Empty;
+            try
+            {
+                uint result = source == PowerSource.PluggedIn
+                    ? PowerGetUserConfiguredACPowerMode(out mode)
+                    : PowerGetUserConfiguredDCPowerMode(out mode);
+                return result == ERROR_SUCCESS;
+            }
+            catch (EntryPointNotFoundException)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Sets the power mode for one source without touching the other. Returns a Win32 error
+        /// code; ERROR_NOT_SUPPORTED if this build has no per-source call.
+        /// </summary>
+        public static uint SetConfiguredPowerMode(PowerSource source, Guid mode)
+        {
+            try
+            {
+                return source == PowerSource.PluggedIn
+                    ? PowerSetUserConfiguredACPowerMode(ref mode)
+                    : PowerSetUserConfiguredDCPowerMode(ref mode);
+            }
+            catch (EntryPointNotFoundException)
+            {
+                return ERROR_NOT_SUPPORTED;
+            }
+        }
+
         // Surface Overlay Power Settings Subgroup & Setting
         public static readonly Guid GUID_SURFACE_OVERLAY_SUBGROUP = new Guid("bfeba2e4-fdcc-41d9-93f4-3f6991c1f730");
         public static readonly Guid GUID_SURFACE_OVERLAY_SETTING  = new Guid("a4a0ab02-11f1-4584-bc52-cbb98eabdb0b");

@@ -67,7 +67,7 @@ namespace SurfaceFanControl.UI.Tray
             menu.Items.Add(header);
             menu.Items.Add(new ToolStripSeparator());
 
-            // Power modes only; none of these changes a fan speed the user has set.
+            // Power modes only, for the power source in use; none of these changes a fan speed the user has set.
             var quietItem = new ToolStripMenuItem("Power Mode: Quiet", null, (s, e) => _viewModel.SetProfile(CoolingProfileType.Quiet));
             var balancedItem = new ToolStripMenuItem("Power Mode: Balanced", null, (s, e) => _viewModel.SetProfile(CoolingProfileType.Balanced));
             var betterItem = new ToolStripMenuItem("Power Mode: Better Performance", null, (s, e) => _viewModel.SetProfile(CoolingProfileType.BetterPerformance));

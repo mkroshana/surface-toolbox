@@ -30,7 +30,8 @@ namespace SurfaceFanControl.Core.Hardware
         private bool _powerModified;
         private bool _disposed;
 
-        public event Action<CoolingProfile>? ProfileApplied;
+        /// <summary>Raised after a power mode is applied, with the power source it was applied to.</summary>
+        public event Action<CoolingProfile, PowerSource>? ProfileApplied;
 
         public SurfacePowerManager()
         {
@@ -84,6 +85,31 @@ namespace SurfaceFanControl.Core.Hardware
                 return FanTargetState.Settling;
 
             return measuredRpm > target ? FanTargetState.HeldAboveTarget : FanTargetState.NotApplied;
+        }
+
+        /// <summary>The power source the device is running on right now.</summary>
+        public PowerSource CurrentPowerSource => IsOnAcPower() ? PowerSource.PluggedIn : PowerSource.Battery;
+
+        /// <summary>
+        /// The power mode Windows uses on the given source. Null when it cannot be read: on a
+        /// Windows build without per-source calls, only the source in use is known.
+        /// </summary>
+        public Guid? GetConfiguredOverlay(PowerSource source)
+        {
+            if (NativePower.TryGetConfiguredPowerMode(source, out Guid mode))
+                return mode;
+
+            return source == CurrentPowerSource ? GetEffectiveOverlayGuid() : null;
+        }
+
+        // Sets one source's power mode. The source in use goes through PowerSetActiveOverlayScheme,
+        // which also makes SMF pick up the change at once; the other source can only be reached
+        // through the per-source call.
+        private uint SetOverlay(PowerSource source, Guid overlay)
+        {
+            return source == CurrentPowerSource
+                ? NativePower.PowerSetActiveOverlayScheme(ref overlay)
+                : NativePower.SetConfiguredPowerMode(source, overlay);
         }
 
         public Guid GetEffectiveOverlayGuid()
@@ -199,7 +225,17 @@ namespace SurfaceFanControl.Core.Hardware
             catch { }
         }
 
+        /// <summary>Applies a power mode to the power source in use.</summary>
         public bool ApplyProfile(CoolingProfile profile)
+        {
+            return ApplyProfile(profile, CurrentPowerSource);
+        }
+
+        /// <summary>
+        /// Applies a power mode to one power source only: that source's power-plan values and its
+        /// Windows power mode. The other source and the fan speed target are left alone.
+        /// </summary>
+        public bool ApplyProfile(CoolingProfile profile, PowerSource source)
         {
             RefreshActiveScheme();
             Guid scheme = _activeSchemeGuid;
@@ -207,23 +243,30 @@ namespace SurfaceFanControl.Core.Hardware
             Guid overlaySetting = NativePower.GUID_SURFACE_OVERLAY_SETTING;
             Guid procSubgroup = NativePower.GUID_PROCESSOR_SUBGROUP;
             Guid procThrottleMax = NativePower.GUID_PROCTHROTTLEMAX;
+            bool isSourceInUse = source == CurrentPowerSource;
 
-            // 1. Write legacy Surface Overlay AC / DC values & Processor Max Throttle
-            CaptureSessionBaseline(scheme);
+            // 1. Write the legacy Surface overlay value and processor max throttle for this source
+            CaptureSessionBaseline(scheme, source);
             _powerModified = true;
-            NativePower.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref overlaySubgroup, ref overlaySetting, profile.SurfaceOverlayAcIndex);
-            NativePower.PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref overlaySubgroup, ref overlaySetting, profile.SurfaceOverlayDcIndex);
-            NativePower.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref procSubgroup, ref procThrottleMax, profile.ProcThrottleMaxAc);
-            NativePower.PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref procSubgroup, ref procThrottleMax, profile.ProcThrottleMaxDc);
+            if (source == PowerSource.PluggedIn)
+            {
+                NativePower.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref overlaySubgroup, ref overlaySetting, profile.SurfaceOverlayAcIndex);
+                NativePower.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref procSubgroup, ref procThrottleMax, profile.ProcThrottleMaxAc);
+            }
+            else
+            {
+                NativePower.PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref overlaySubgroup, ref overlaySetting, profile.SurfaceOverlayDcIndex);
+                NativePower.PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref procSubgroup, ref procThrottleMax, profile.ProcThrottleMaxDc);
+            }
             uint schemeResult = NativePower.PowerSetActiveScheme(IntPtr.Zero, ref scheme);
 
-            // 2. Set Windows 11 Modern Standby Overlay Scheme (updates SMF Core I_SLIDER, O_FAN1_PROFILE, and PL1/PL2)
-            Guid overlayGuid = profile.OverlaySchemeGuid;
-            uint overlayResult = NativePower.PowerSetActiveOverlayScheme(ref overlayGuid);
+            // 2. Set this source's Windows power mode (for the source in use this updates SMF Core
+            //    I_SLIDER, O_FAN1_PROFILE and PL1/PL2 at once)
+            uint overlayResult = SetOverlay(source, profile.OverlaySchemeGuid);
             LastOverlayFailed = overlayResult != NativePower.ERROR_SUCCESS;
             LastFanCommandFailed = false;
 
-            // 3. Keep the SAM's fan profile in step with the power mode, as SMF itself does.
+            // 3. Keep the SAM's fan profile in step with the power mode in use, as SMF itself does.
             //    The fan speed target is a separate setting and is deliberately left alone here.
             bool profileSet = false;
             lock (_fanLock)
@@ -231,20 +274,23 @@ namespace SurfaceFanControl.Core.Hardware
                 if (_disposed)
                     return false;
 
-                _activeSamFanProfile = profile.SamFanProfile;
-                if (_samClient.IsDirectSamAvailable)
+                if (isSourceInUse)
                 {
-                    profileSet = _samClient.TrySetFanProfile(profile.SamFanProfile);
-                    if (profileSet)
+                    _activeSamFanProfile = profile.SamFanProfile;
+                    if (_samClient.IsDirectSamAvailable)
                     {
-                        _samModified = true;
+                        profileSet = _samClient.TrySetFanProfile(profile.SamFanProfile);
+                        if (profileSet)
+                        {
+                            _samModified = true;
+                        }
                     }
                 }
             }
 
             if (overlayResult == NativePower.ERROR_SUCCESS || schemeResult == NativePower.ERROR_SUCCESS || profileSet)
             {
-                ProfileApplied?.Invoke(profile);
+                ProfileApplied?.Invoke(profile, source);
                 return true;
             }
 
@@ -377,7 +423,12 @@ namespace SurfaceFanControl.Core.Hardware
             Guid stockOverlay = Guid.TryParse(_stockBackup.EffectiveOverlayGuid, out Guid parsedOverlay)
                 ? parsedOverlay
                 : NativePower.GUID_OVERLAY_BALANCED;
-            uint overlayResult = NativePower.PowerSetActiveOverlayScheme(ref stockOverlay);
+            // Stock applies to both power sources. The source in use decides success; the other
+            // is best effort, since older Windows builds cannot reach it.
+            PowerSource inUse = CurrentPowerSource;
+            PowerSource other = inUse == PowerSource.PluggedIn ? PowerSource.Battery : PowerSource.PluggedIn;
+            uint overlayResult = SetOverlay(inUse, stockOverlay);
+            SetOverlay(other, stockOverlay);
 
             // An explicit reset to stock replaces whatever was there before the session, so
             // there is nothing left for the exit path to put back.
@@ -412,7 +463,8 @@ namespace SurfaceFanControl.Core.Hardware
                     OverlaySchemeGuid = stockOverlay,
                     SamFanProfile = 2
                 };
-                ProfileApplied?.Invoke(stockProfile);
+                ProfileApplied?.Invoke(stockProfile, other);
+                ProfileApplied?.Invoke(stockProfile, inUse);
                 return true;
             }
 
@@ -497,7 +549,7 @@ namespace SurfaceFanControl.Core.Hardware
         }
 
         // Records the settings a profile is about to overwrite, the first time each is touched.
-        private void CaptureSessionBaseline(Guid scheme)
+        private void CaptureSessionBaseline(Guid scheme, PowerSource source)
         {
             bool changed = false;
 
@@ -523,19 +575,20 @@ namespace SurfaceFanControl.Core.Hardware
                 changed = true;
             }
 
-            // PowerSetActiveOverlayScheme only changes the power mode of the current power source,
-            // so the mode is recorded per source, the first time the app is about to change it.
-            if (IsOnAcPower())
+            // Windows keeps a power mode per power source, so the mode is recorded per source,
+            // the first time the app is about to change it. If it cannot be read it stays null
+            // and is left alone on restore.
+            if (source == PowerSource.PluggedIn)
             {
-                if (_sessionBaseline.AcOverlayGuid == null)
+                if (_sessionBaseline.AcOverlayGuid == null && GetConfiguredOverlay(source) is Guid acMode)
                 {
-                    _sessionBaseline.AcOverlayGuid = GetEffectiveOverlayGuid().ToString();
+                    _sessionBaseline.AcOverlayGuid = acMode.ToString();
                     changed = true;
                 }
             }
-            else if (_sessionBaseline.DcOverlayGuid == null)
+            else if (_sessionBaseline.DcOverlayGuid == null && GetConfiguredOverlay(source) is Guid dcMode)
             {
-                _sessionBaseline.DcOverlayGuid = GetEffectiveOverlayGuid().ToString();
+                _sessionBaseline.DcOverlayGuid = dcMode.ToString();
                 changed = true;
             }
 
@@ -550,8 +603,8 @@ namespace SurfaceFanControl.Core.Hardware
             }
         }
 
-        // Puts back the power-plan values and the power mode recorded before the app changed them.
-        // Only the current power source's mode can be set; the other source keeps what it has.
+        // Puts back the power-plan values and both sources' power modes as recorded before the
+        // app changed them.
         private void RestoreSessionBaseline()
         {
             SessionBaseline? baseline = _sessionBaseline;
@@ -584,10 +637,13 @@ namespace SurfaceFanControl.Core.Hardware
             Guid active = _activeSchemeGuid;
             NativePower.PowerSetActiveScheme(IntPtr.Zero, ref active);
 
-            string? savedOverlay = IsOnAcPower() ? baseline.AcOverlayGuid : baseline.DcOverlayGuid;
-            if (Guid.TryParse(savedOverlay, out Guid overlay))
+            if (Guid.TryParse(baseline.AcOverlayGuid, out Guid acOverlay))
             {
-                NativePower.PowerSetActiveOverlayScheme(ref overlay);
+                SetOverlay(PowerSource.PluggedIn, acOverlay);
+            }
+            if (Guid.TryParse(baseline.DcOverlayGuid, out Guid dcOverlay))
+            {
+                SetOverlay(PowerSource.Battery, dcOverlay);
             }
 
             ClearSessionBaseline();
