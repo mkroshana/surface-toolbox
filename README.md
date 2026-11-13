@@ -2,6 +2,18 @@
 
 A native Windows 11 hardware fan controller and thermal telemetry dashboard for Microsoft Surface devices (engineered and verified on **Surface Pro 9**). It combines direct **Surface System Aggregator Module (SAM)** serial hub commands (`TC_FAN = 0x05`), **Surface System Management Framework (SMF Core)** real-time channel queries, and **Windows 11 Modern Standby Power Overlays**.
 
+It has grown into a small toolbox. Each sidebar entry is one page:
+
+| Page | What It Does | Changes Anything? |
+| :--- | :--- | :--- |
+| **Thermal & Power** | Live temperatures, fan speed and power limits; power mode per power source (plugged in / on battery); fan speed request; reset to stock | Yes: power mode and fan speed |
+| **Battery** | Charge, health against design capacity, cycle count, power flow, time estimate | No |
+| **Display** | Refresh rate and brightness of the built-in display | Yes: refresh rate and brightness |
+| **History** | Charts of peak temperature, fan speed and CPU load for the last 5, 15 or 60 minutes; CSV export. Kept in memory only | No |
+| **Device** | Model, Windows build, UEFI and firmware component versions, SSD health. No serial numbers | No |
+| **Diagnostics** | Creates and opens Windows' own battery report and sleep study | No |
+| **Settings** | Start with Windows, in the tray, through a Task Scheduler task | Yes: the sign-in task |
+
 ---
 
 ## Hardware Architecture & Reverse-Engineered Protocols
@@ -97,7 +109,19 @@ Calling `PowerSetActiveOverlayScheme(ref Guid overlayGuid)` immediately transiti
 - `src/SurfaceFanControl.Core/Hardware/NativePower.cs` — `powrprof.dll` P/Invoke declarations (`PowerGetEffectiveOverlayScheme`, `PowerSetActiveOverlayScheme`, legacy scheme APIs).
 - `src/SurfaceFanControl.Core/Hardware/SurfacePowerManager.cs` — Coordinates overlay switching, direct SAM fan commands, periodic RPM keep-alive, baseline backup (`%LOCALAPPDATA%\SurfaceFanControl\stock_settings_backup.json`), and, on disposal, restoration of the power settings as they were before the app changed them (`session_baseline.json` in the same folder, kept only while changes are outstanding) and `0 RPM` automatic fan control.
 - `src/SurfaceFanControl.Core/Hardware/SurfaceThermalMonitor.cs` — 1-second hardware polling loop reading ACPI thermal zones (`\_SB.TZ01`..`\_SB.TZ0B`), live SAM tachometer RPM, SMF fan profile, and `PL1`/`PL2` wattages.
-- `src/SurfaceFanControl.UI/` — WPF dashboard (`MainWindow.xaml`, `MainViewModel.cs`) and system tray integration (`TrayIconManager.cs`). Configured with `requireAdministrator` in `app.manifest`.
+- `src/SurfaceFanControl.Core/Hardware/SurfaceBatteryClient.cs` — Battery readings through the standard Windows battery driver interface (`IOCTL_BATTERY_QUERY_*`). Used instead of the `root\WMI` battery classes because `BatteryStaticData`, the only WMI source of design capacity, fails on the Surface Pro 9.
+- `src/SurfaceFanControl.Core/Hardware/SurfaceDisplayClient.cs` — Refresh rate (`EnumDisplaySettings` / `ChangeDisplaySettingsEx`) and brightness (`root\WMI` `WmiMonitorBrightness`).
+- `src/SurfaceFanControl.Core/Hardware/SurfaceDeviceReportReader.cs` — Device, firmware version and storage health report from standard WMI classes.
+- `src/SurfaceFanControl.Core/Hardware/PowerReportGenerator.cs` — Runs `powercfg /batteryreport` and `powercfg /sleepstudy`.
+- `src/SurfaceFanControl.Core/Models/TelemetryHistory.cs` — One-hour in-memory ring buffer of readings, downsampling for charts, CSV writer.
+- `src/SurfaceFanControl.UI/` — WPF app, configured with `requireAdministrator` in `app.manifest`. `MainWindow.xaml` is the shell (header, sidebar, status bar); each page is a `UserControl` under `Views/` with its view model under `ViewModels/`. `Controls/LineChart.cs` draws the history charts. `Services/ShellLauncher.cs` opens files and links through the desktop shell so they do not inherit administrator rights; `Services/AutostartService.cs` manages the sign-in task. `Tray/TrayIconManager.cs` is the tray icon and menu.
+
+---
+
+## Researched and Not Implemented
+
+- **Battery charge limit (stop at 80%).** No interface for it was found on the Surface Pro 9: nothing in the registry, the power plan, or `root\WMI`, and the Linux `surface_battery` driver, which speaks the same SAM battery protocol, has no charge-limit command either (it reads status and sets only a low-battery trip point). Microsoft documents automatic Smart Charging and a 50% Battery Limit Mode in UEFI for this model; a user-selectable 80% is described for the Surface app on some devices and firmware. Adding it here would mean reverse-engineering the Surface app's own channel on a device that offers the option.
+- **Surface Pen battery level.** Windows exposes a Bluetooth device's battery through a PnP property, but no device on the test Surface reported one and no pen was paired, so nothing could be verified.
 
 ---
 
@@ -118,6 +142,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Run
 
 # Run the automated hardware verification suite (requires PowerShell 7 / pwsh for .NET 8 assembly loading)
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\test_verification.ps1
+
+# Check the toolbox pages' data against Windows' own figures (read-only by default)
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\test_toolbox.ps1
+# Add -IncludeWrites to also exercise per-source power modes and the sign-in task; everything is put back
 
 # Restore OEM stock power overlay and reset SAM fan to 0 RPM (Auto)
 # Note: Administrator privileges are required to reset a direct SAM fan speed override (MSHW0084)
