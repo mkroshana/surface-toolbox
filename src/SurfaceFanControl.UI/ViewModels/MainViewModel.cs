@@ -37,13 +37,13 @@ namespace SurfaceFanControl.UI.ViewModels
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        public MainViewModel()
+        public MainViewModel(SurfaceDeviceInfo? deviceInfo = null)
         {
             Zones = new ObservableCollection<ThermalZoneInfo>();
 
             _powerManager = new SurfacePowerManager();
             _profileManager = new ProfileManager(_powerManager);
-            _deviceInfo = SurfaceDeviceDetector.Detect();
+            _deviceInfo = deviceInfo ?? SurfaceDeviceDetector.Detect();
 
             _activeProfile = _profileManager.ActiveProfile;
             _isDirectSamAvailable = _powerManager.IsDirectSamAvailable;

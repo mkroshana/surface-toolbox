@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Windows;
+using SurfaceFanControl.Core.Hardware;
 using SurfaceFanControl.UI.Tray;
 using SurfaceFanControl.UI.ViewModels;
 using SurfaceFanControl.UI.Views;
@@ -47,7 +48,28 @@ namespace SurfaceFanControl.UI
                 return;
             }
 
-            _viewModel = new MainViewModel();
+            // Refuse to run on anything that is not a Surface: the profiles write power
+            // settings and send SAM fan commands that are only meaningful on Surface hardware.
+            var deviceInfo = SurfaceDeviceDetector.Detect();
+            if (!deviceInfo.IsSurfaceDevice)
+            {
+                string detected = $"{deviceInfo.Manufacturer} {deviceInfo.Model}".Trim();
+                if (detected.Length == 0)
+                {
+                    detected = "Unknown";
+                }
+
+                System.Windows.MessageBox.Show(
+                    "Surface Fan Control only runs on Microsoft Surface devices.\n\n" +
+                    $"Detected device: {detected}",
+                    "Surface Fan Control",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                Shutdown();
+                return;
+            }
+
+            _viewModel = new MainViewModel(deviceInfo);
             _mainWindow = new MainWindow
             {
                 DataContext = _viewModel

@@ -50,7 +50,8 @@ namespace SurfaceFanControl.Core.Hardware
             }
             catch { }
 
-            info.IsSurfaceDevice = info.Manufacturer.Contains("Microsoft", StringComparison.OrdinalIgnoreCase) ||
+            // Both must match: Hyper-V guests also report "Microsoft Corporation" as the manufacturer.
+            info.IsSurfaceDevice = info.Manufacturer.Contains("Microsoft", StringComparison.OrdinalIgnoreCase) &&
                                   info.Model.Contains("Surface", StringComparison.OrdinalIgnoreCase);
 
             // Check if Surface Overlay power setting can be read
