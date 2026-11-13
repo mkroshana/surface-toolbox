@@ -1,8 +1,10 @@
-# Surface Fan Control for Microsoft Surface Devices
+# Surface Toolbox
 
-A native Windows 11 hardware fan controller and thermal telemetry dashboard for Microsoft Surface devices (engineered and verified on **Surface Pro 9**). It combines direct **Surface System Aggregator Module (SAM)** serial hub commands (`TC_FAN = 0x05`), **Surface System Management Framework (SMF Core)** real-time channel queries, and **Windows 11 Modern Standby Power Overlays**.
+A native Windows 11 toolbox for Microsoft Surface devices (engineered and verified on **Surface Pro 9**): fan and power control, battery, display, history, device information and diagnostics. The fan and power side combines direct **Surface System Aggregator Module (SAM)** serial hub commands (`TC_FAN = 0x05`), **Surface System Management Framework (SMF Core)** real-time channel queries, and **Windows 11 Modern Standby Power Overlays**.
 
-It has grown into a small toolbox. Each sidebar entry is one page:
+Formerly **Surface Fan Control**. The first time this version runs it moves its data folder from `%LOCALAPPDATA%\SurfaceFanControl` to `%LOCALAPPDATA%\SurfaceToolbox`, so the stock settings backup is kept, and it re-registers a sign-in task left under the old name.
+
+Each sidebar entry is one page:
 
 | Page | What It Does | Changes Anything? |
 | :--- | :--- | :--- |
@@ -105,16 +107,16 @@ Calling `PowerSetActiveOverlayScheme(ref Guid overlayGuid)` immediately transiti
 
 ## Project Structure
 
-- `src/SurfaceFanControl.Core/Hardware/SurfaceSamClient.cs` — Direct `MSHW0084` (`0x04001C48`) fan RPM/profile control and `SMF Core` (`0x1FAA000C`) telemetry client.
-- `src/SurfaceFanControl.Core/Hardware/NativePower.cs` — `powrprof.dll` P/Invoke declarations (`PowerGetEffectiveOverlayScheme`, `PowerSetActiveOverlayScheme`, legacy scheme APIs).
-- `src/SurfaceFanControl.Core/Hardware/SurfacePowerManager.cs` — Coordinates overlay switching, direct SAM fan commands, periodic RPM keep-alive, baseline backup (`%LOCALAPPDATA%\SurfaceFanControl\stock_settings_backup.json`), and, on disposal, restoration of the power settings as they were before the app changed them (`session_baseline.json` in the same folder, kept only while changes are outstanding) and `0 RPM` automatic fan control.
-- `src/SurfaceFanControl.Core/Hardware/SurfaceThermalMonitor.cs` — 1-second hardware polling loop reading ACPI thermal zones (`\_SB.TZ01`..`\_SB.TZ0B`), live SAM tachometer RPM, SMF fan profile, and `PL1`/`PL2` wattages.
-- `src/SurfaceFanControl.Core/Hardware/SurfaceBatteryClient.cs` — Battery readings through the standard Windows battery driver interface (`IOCTL_BATTERY_QUERY_*`). Used instead of the `root\WMI` battery classes because `BatteryStaticData`, the only WMI source of design capacity, fails on the Surface Pro 9.
-- `src/SurfaceFanControl.Core/Hardware/SurfaceDisplayClient.cs` — Refresh rate (`EnumDisplaySettings` / `ChangeDisplaySettingsEx`) and brightness (`root\WMI` `WmiMonitorBrightness`).
-- `src/SurfaceFanControl.Core/Hardware/SurfaceDeviceReportReader.cs` — Device, firmware version and storage health report from standard WMI classes.
-- `src/SurfaceFanControl.Core/Hardware/PowerReportGenerator.cs` — Runs `powercfg /batteryreport` and `powercfg /sleepstudy`.
-- `src/SurfaceFanControl.Core/Models/TelemetryHistory.cs` — One-hour in-memory ring buffer of readings, downsampling for charts, CSV writer.
-- `src/SurfaceFanControl.UI/` — WPF app, configured with `requireAdministrator` in `app.manifest`. `MainWindow.xaml` is the shell (header, sidebar, status bar); each page is a `UserControl` under `Views/` with its view model under `ViewModels/`. `Controls/LineChart.cs` draws the history charts. `Services/ShellLauncher.cs` opens files and links through the desktop shell so they do not inherit administrator rights; `Services/AutostartService.cs` manages the sign-in task. `Tray/TrayIconManager.cs` is the tray icon and menu.
+- `src/SurfaceToolbox.Core/Hardware/SurfaceSamClient.cs` — Direct `MSHW0084` (`0x04001C48`) fan RPM/profile control and `SMF Core` (`0x1FAA000C`) telemetry client.
+- `src/SurfaceToolbox.Core/Hardware/NativePower.cs` — `powrprof.dll` P/Invoke declarations (`PowerGetEffectiveOverlayScheme`, `PowerSetActiveOverlayScheme`, legacy scheme APIs).
+- `src/SurfaceToolbox.Core/Hardware/SurfacePowerManager.cs` — Coordinates overlay switching, direct SAM fan commands, periodic RPM keep-alive, baseline backup (`%LOCALAPPDATA%\SurfaceToolbox\stock_settings_backup.json`), and, on disposal, restoration of the power settings as they were before the app changed them (`session_baseline.json` in the same folder, kept only while changes are outstanding) and `0 RPM` automatic fan control.
+- `src/SurfaceToolbox.Core/Hardware/SurfaceThermalMonitor.cs` — 1-second hardware polling loop reading ACPI thermal zones (`\_SB.TZ01`..`\_SB.TZ0B`), live SAM tachometer RPM, SMF fan profile, and `PL1`/`PL2` wattages.
+- `src/SurfaceToolbox.Core/Hardware/SurfaceBatteryClient.cs` — Battery readings through the standard Windows battery driver interface (`IOCTL_BATTERY_QUERY_*`). Used instead of the `root\WMI` battery classes because `BatteryStaticData`, the only WMI source of design capacity, fails on the Surface Pro 9.
+- `src/SurfaceToolbox.Core/Hardware/SurfaceDisplayClient.cs` — Refresh rate (`EnumDisplaySettings` / `ChangeDisplaySettingsEx`) and brightness (`root\WMI` `WmiMonitorBrightness`).
+- `src/SurfaceToolbox.Core/Hardware/SurfaceDeviceReportReader.cs` — Device, firmware version and storage health report from standard WMI classes.
+- `src/SurfaceToolbox.Core/Hardware/PowerReportGenerator.cs` — Runs `powercfg /batteryreport` and `powercfg /sleepstudy`.
+- `src/SurfaceToolbox.Core/Models/TelemetryHistory.cs` — One-hour in-memory ring buffer of readings, downsampling for charts, CSV writer.
+- `src/SurfaceToolbox.UI/` — WPF app, configured with `requireAdministrator` in `app.manifest`. `MainWindow.xaml` is the shell (header, sidebar, status bar); each page is a `UserControl` under `Views/` with its view model under `ViewModels/`. `Controls/LineChart.cs` draws the history charts. `Services/ShellLauncher.cs` opens files and links through the desktop shell so they do not inherit administrator rights; `Services/AutostartService.cs` manages the sign-in task. `Tray/TrayIconManager.cs` is the tray icon and menu.
 
 ---
 
@@ -129,7 +131,7 @@ Calling `PowerSetActiveOverlayScheme(ref Guid overlayGuid)` immediately transiti
 
 ### Compiled Executable Location
 ```text
-c:\GitHub\Surface-FanControl\src\SurfaceFanControl.UI\bin\Release\net8.0-windows\SurfaceFanControl.UI.exe
+c:\GitHub\Surface-Toolbox\src\SurfaceToolbox.UI\bin\Release\net8.0-windows\SurfaceToolbox.UI.exe
 ```
 
 ### Commands

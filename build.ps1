@@ -31,9 +31,9 @@ function Resolve-DotNet {
 }
 
 if ($RestoreStock) {
-    if (Get-Process -Name "SurfaceFanControl.UI" -ErrorAction SilentlyContinue) {
-        Write-Host "[*] Stopping running SurfaceFanControl.UI instance..." -ForegroundColor Yellow
-        Stop-Process -Name "SurfaceFanControl.UI" -Force -ErrorAction SilentlyContinue
+    if (Get-Process -Name "SurfaceToolbox.UI" -ErrorAction SilentlyContinue) {
+        Write-Host "[*] Stopping running SurfaceToolbox.UI instance..." -ForegroundColor Yellow
+        Stop-Process -Name "SurfaceToolbox.UI" -Force -ErrorAction SilentlyContinue
         Start-Sleep -Milliseconds 300
     }
     Write-Host "[*] Executing stock settings restore script..." -ForegroundColor Cyan
@@ -42,12 +42,12 @@ if ($RestoreStock) {
 }
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "         Surface Fan Control - Build Script               " -ForegroundColor White
+Write-Host "         Surface Toolbox - Build Script               " -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-if (Get-Process -Name "SurfaceFanControl.UI" -ErrorAction SilentlyContinue) {
-    Write-Host "[*] Stopping running SurfaceFanControl.UI instance..." -ForegroundColor Yellow
-    Stop-Process -Name "SurfaceFanControl.UI" -Force -ErrorAction SilentlyContinue
+if (Get-Process -Name "SurfaceToolbox.UI" -ErrorAction SilentlyContinue) {
+    Write-Host "[*] Stopping running SurfaceToolbox.UI instance..." -ForegroundColor Yellow
+    Stop-Process -Name "SurfaceToolbox.UI" -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 300
 }
 
@@ -57,7 +57,7 @@ $dotnetExe = Resolve-DotNet
 Write-Host "[*] Using dotnet: $dotnetExe" -ForegroundColor Gray
 & $dotnetExe --version
 
-$slnPath = Join-Path $scriptDir "src\SurfaceFanControl.sln"
+$slnPath = Join-Path $scriptDir "src\SurfaceToolbox.sln"
 Write-Host "[*] Building Solution ($Configuration): $slnPath..." -ForegroundColor Cyan
 & $dotnetExe build $slnPath -c $Configuration -p:Platform="Any CPU"
 
@@ -69,9 +69,9 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "[OK] Build completed successfully!" -ForegroundColor Green
 
 if ($Run) {
-    $exePath = Join-Path $scriptDir "src\SurfaceFanControl.UI\bin\$Configuration\net8.0-windows\SurfaceFanControl.UI.exe"
+    $exePath = Join-Path $scriptDir "src\SurfaceToolbox.UI\bin\$Configuration\net8.0-windows\SurfaceToolbox.UI.exe"
     if (Test-Path $exePath) {
-        Write-Host "[*] Launching Surface Fan Control: $exePath..." -ForegroundColor Green
+        Write-Host "[*] Launching Surface Toolbox: $exePath..." -ForegroundColor Green
         Start-Process -FilePath $exePath
     } else {
         Write-Error "Could not find built executable at: $exePath"

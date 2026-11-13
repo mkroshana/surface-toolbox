@@ -28,8 +28,8 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
 }
 
 $rootDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$bin = Join-Path $rootDir "src\SurfaceFanControl.UI\bin\Release\net8.0-windows"
-foreach ($dll in "SurfaceFanControl.Core.dll", "SurfaceFanControl.UI.dll") {
+$bin = Join-Path $rootDir "src\SurfaceToolbox.UI\bin\Release\net8.0-windows"
+foreach ($dll in "SurfaceToolbox.Core.dll", "SurfaceToolbox.UI.dll") {
     $path = Join-Path $bin $dll
     if (-not (Test-Path $path)) { Write-Host "[ERROR] Not built: $path. Run build.ps1 first." -ForegroundColor Red; exit 1 }
     [System.Reflection.Assembly]::LoadFrom($path) | Out-Null
@@ -43,8 +43,8 @@ function Check([string]$what, $actual, $expected) {
 }
 function Section([string]$title) { Write-Host ""; Write-Host "--- $title ---" -ForegroundColor Yellow }
 
-$NP  = [SurfaceFanControl.Core.Hardware.NativePower]
-$SRC = [SurfaceFanControl.Core.Hardware.PowerSource]
+$NP  = [SurfaceToolbox.Core.Hardware.NativePower]
+$SRC = [SurfaceToolbox.Core.Hardware.PowerSource]
 $modeNames = @{ "961cc777-2547-4f9d-8174-7d86181b8a7a" = "BestEfficiency"; "00000000-0000-0000-0000-000000000000" = "Recommended"
                 "3af9b8d9-7c97-431d-ad78-34a8bfea439f" = "BetterPerf"; "ded574b5-45a0-4f42-8737-46345c09c238" = "BestPerf" }
 function ModeName($g) { $k = "$g".ToLower(); if ($modeNames.ContainsKey($k)) { $modeNames[$k] } else { $k } }
@@ -55,12 +55,12 @@ function Caps {
 }
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "   Surface Fan Control - Toolbox Checks                   " -ForegroundColor White
+Write-Host "   Surface Toolbox - Toolbox Checks                   " -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # 1. Battery -----------------------------------------------------------------------------------------
 Section "Battery: the reader against Windows' battery report"
-$battery = [SurfaceFanControl.Core.Hardware.SurfaceBatteryClient]::new().Read()
+$battery = [SurfaceToolbox.Core.Hardware.SurfaceBatteryClient]::new().Read()
 if ($null -eq $battery) {
     Check "battery found" $false $true
 } else {
@@ -80,7 +80,7 @@ if ($null -eq $battery) {
 
 # 2. Device ------------------------------------------------------------------------------------------
 Section "Device: the report against WMI and the storage cmdlets"
-$device = [SurfaceFanControl.Core.Hardware.SurfaceDeviceReportReader]::new().Read()
+$device = [SurfaceToolbox.Core.Hardware.SurfaceDeviceReportReader]::new().Read()
 $cs = Get-CimInstance Win32_ComputerSystem; $os = Get-CimInstance Win32_OperatingSystem; $bios = Get-CimInstance Win32_BIOS
 Check "model" $device.Model $cs.Model
 Check "memory GB" $device.MemoryGb ([math]::Round($cs.TotalPhysicalMemory / 1GB, 1))
@@ -99,7 +99,7 @@ if ($disk -and $device.Drives.Count -gt 0) {
 
 # 3. History -----------------------------------------------------------------------------------------
 Section "History: buffer, downsampling and CSV"
-$H = [SurfaceFanControl.Core.Models.TelemetryHistory]; $S = [SurfaceFanControl.Core.Models.TelemetrySample]
+$H = [SurfaceToolbox.Core.Models.TelemetryHistory]; $S = [SurfaceToolbox.Core.Models.TelemetrySample]
 $t0 = [DateTime]::new(2026, 1, 1, 0, 0, 0, [DateTimeKind]::Utc)
 $history = $H::new(10)
 0..24 | ForEach-Object { $history.Add($S::new($t0.AddSeconds($_), 40 + $_ * 0.1, 35.0, 3000 + $_, [double]($_ % 100), 2000.0, ($_ % 2 -eq 0), 80)) }
@@ -117,10 +117,10 @@ $writer2 = [System.IO.StringWriter]::new(); $null = $small.WriteCsv($writer2)
 [System.Threading.Thread]::CurrentThread.CurrentCulture = $previousCulture
 Check "CSV is the same under a comma-decimal culture" ($writer2.ToString() -eq $writer.ToString()) $true
 
-$historyVm = [SurfaceFanControl.UI.ViewModels.HistoryViewModel]::new(); $historyVm.SetVisible($true)
+$historyVm = [SurfaceToolbox.UI.ViewModels.HistoryViewModel]::new(); $historyVm.SetVisible($true)
 $start = [DateTime]::UtcNow.AddMinutes(-10)
 0..599 | ForEach-Object {
-    $snap = [SurfaceFanControl.Core.Models.SystemThermalSnapshot]::new()
+    $snap = [SurfaceToolbox.Core.Models.SystemThermalSnapshot]::new()
     $snap.Timestamp = $start.AddSeconds($_); $snap.PeakTemperatureCelsius = 40 + $_ * 0.01; $snap.FanRpm = $(if ($_ -lt 300) { 0 } else { 3000 }); $snap.CpuPerformancePercent = 25
     $historyVm.Record($snap)
 }
@@ -141,20 +141,20 @@ Check "on-battery mode" (ModeOf $SRC::Battery) (ModeName $reg.ActiveOverlayDcPow
 
 # 5. Sign-in task definition (not registered) --------------------------------------------------------
 Section "Sign-in task: the definition the app would register"
-$Autostart = [SurfaceFanControl.UI.Services.AutostartService]
-$definition = $Autostart::BuildDefinition("C:\Some Folder\SurfaceFanControl.UI.exe")
+$Autostart = [SurfaceToolbox.UI.Services.AutostartService]
+$definition = $Autostart::BuildDefinition("C:\Some Folder\SurfaceToolbox.UI.exe")
 $ns = "http://schemas.microsoft.com/windows/2004/02/mit/task"
 function TaskValue([string[]]$path) { $e = $definition.Root; foreach ($p in $path) { $e = $e.Element([System.Xml.Linq.XName]::Get($p, $ns)) }; $e.Value }
 Check "starts on battery" (TaskValue "Settings", "DisallowStartIfOnBatteries") "false"
 Check "keeps running on battery" (TaskValue "Settings", "StopIfGoingOnBatteries") "false"
 Check "no time limit" (TaskValue "Settings", "ExecutionTimeLimit") "PT0S"
 Check "highest privileges" (TaskValue "Principals", "Principal", "RunLevel") "HighestAvailable"
-Check "program is quoted" (TaskValue "Actions", "Exec", "Command") '"C:\Some Folder\SurfaceFanControl.UI.exe"'
+Check "program is quoted" (TaskValue "Actions", "Exec", "Command") '"C:\Some Folder\SurfaceToolbox.UI.exe"'
 Check "starts in the tray" (TaskValue "Actions", "Exec", "Arguments") "--tray"
 
 # 6. Checks that change settings and put them back ---------------------------------------------------
 if ($IncludeWrites) {
-    $appRunning = [bool](Get-Process -Name "SurfaceFanControl.UI" -ErrorAction SilentlyContinue)
+    $appRunning = [bool](Get-Process -Name "SurfaceToolbox.UI" -ErrorAction SilentlyContinue)
     $taskName = $Autostart::TaskName
     $taskExists = [bool](Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)
 
@@ -162,10 +162,10 @@ if ($IncludeWrites) {
     if ($appRunning) {
         Write-Host "  [SKIP] The app is running; close it first." -ForegroundColor Yellow
     } else {
-        $CP = [SurfaceFanControl.Core.Profiles.CoolingProfile]
-        $sessionFile = "$env:LOCALAPPDATA\SurfaceFanControl\session_baseline.json"
+        $CP = [SurfaceToolbox.Core.Profiles.CoolingProfile]
+        $sessionFile = "$env:LOCALAPPDATA\SurfaceToolbox\session_baseline.json"
         $origAc = [Guid]"$($reg.ActiveOverlayAcPowerScheme)"; $origDc = [Guid]"$($reg.ActiveOverlayDcPowerScheme)"; $origCaps = Caps
-        $manager = [SurfaceFanControl.Core.Hardware.SurfacePowerManager]::new()
+        $manager = [SurfaceToolbox.Core.Hardware.SurfacePowerManager]::new()
         try {
             $inUse = $manager.CurrentPowerSource
             $other = if ($inUse -eq $SRC::PluggedIn) { $SRC::Battery } else { $SRC::PluggedIn }
@@ -194,7 +194,7 @@ if ($IncludeWrites) {
     if ($taskExists) {
         Write-Host "  [SKIP] '$taskName' already exists on this device; leaving it alone." -ForegroundColor Yellow
     } else {
-        $service = $Autostart::new(); $exe = Join-Path $bin "SurfaceFanControl.UI.exe"; $err = ""
+        $service = $Autostart::new(); $exe = Join-Path $bin "SurfaceToolbox.UI.exe"; $err = ""
         try {
             Check "Enable" $service.Enable($exe, [ref]$err) $true
             $task = Get-ScheduledTask -TaskName $taskName

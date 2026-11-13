@@ -2,7 +2,7 @@
 .SYNOPSIS
     Restores Microsoft Surface power, overlay, and SAM fan settings to factory OEM defaults.
 .DESCRIPTION
-    This script reads any saved baseline backup created by Surface Fan Control, or applies
+    This script reads any saved baseline backup created by Surface Toolbox, or applies
     the standard Microsoft Surface defaults:
       - Windows 11 Power Slider Overlay: Recommended / Balanced (00000000-0000-0000-0000-000000000000)
       - Direct SAM Fan RPM Override: 0 RPM (Auto) & Profile 2 (when running as Administrator)
@@ -11,7 +11,7 @@
 #>
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "   Surface Fan Control - Stock Settings Restore Utility   " -ForegroundColor White
+Write-Host "   Surface Toolbox - Stock Settings Restore Utility   " -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -21,19 +21,24 @@ $procSub  = "54533251-82be-4824-96c1-47b60b740d00"
 $procMax  = "bc5038f7-23e0-4960-96da-33abaf5935ec"
 $procMin  = "893dee8e-2bef-41e0-89c6-b55d0929964c"
 
-$runningApp = Get-Process -Name "SurfaceFanControl.UI" -ErrorAction SilentlyContinue
+$runningApp = Get-Process -Name "SurfaceToolbox.UI" -ErrorAction SilentlyContinue
 if ($null -ne $runningApp) {
-    Write-Host "[*] Stopping running SurfaceFanControl.UI instance to prevent keep-alive override..." -ForegroundColor Yellow
+    Write-Host "[*] Stopping running SurfaceToolbox.UI instance to prevent keep-alive override..." -ForegroundColor Yellow
     try {
-        Stop-Process -Name "SurfaceFanControl.UI" -Force -ErrorAction Stop
+        Stop-Process -Name "SurfaceToolbox.UI" -Force -ErrorAction Stop
         Start-Sleep -Milliseconds 300
-        Write-Host "[+] Stopped running SurfaceFanControl.UI process." -ForegroundColor Green
+        Write-Host "[+] Stopped running SurfaceToolbox.UI process." -ForegroundColor Green
     } catch {
-        Write-Host "[WARN] Could not stop running SurfaceFanControl.UI process (it may be running as Administrator). Run this script as Administrator to stop it." -ForegroundColor Yellow
+        Write-Host "[WARN] Could not stop running SurfaceToolbox.UI process (it may be running as Administrator). Run this script as Administrator to stop it." -ForegroundColor Yellow
     }
 }
 
-$backupFile = "$env:LOCALAPPDATA\SurfaceFanControl\stock_settings_backup.json"
+$backupFile = "$env:LOCALAPPDATA\SurfaceToolbox\stock_settings_backup.json"
+if (-not (Test-Path $backupFile)) {
+    # The app was called Surface Fan Control before; its backup stays in the old folder until the renamed app has run once.
+    $legacyBackup = Join-Path $env:LOCALAPPDATA ("Surface" + "FanControl\stock_settings_backup.json")
+    if (Test-Path $legacyBackup) { $backupFile = $legacyBackup }
+}
 $activeSchemeGuid = "SCHEME_CURRENT"
 $overlayAc = 1
 $overlayDc = 2

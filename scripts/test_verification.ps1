@@ -9,8 +9,8 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $rootDir   = Split-Path -Parent $scriptDir
 
 # Load compiled assembly (prefer UI output directory which includes System.Management.dll and runtime dependencies)
-$uiCoreDll = Join-Path $rootDir "src\SurfaceFanControl.UI\bin\Release\net8.0-windows\SurfaceFanControl.Core.dll"
-$fallbackCoreDll = Join-Path $rootDir "src\SurfaceFanControl.Core\bin\Release\net8.0-windows\SurfaceFanControl.Core.dll"
+$uiCoreDll = Join-Path $rootDir "src\SurfaceToolbox.UI\bin\Release\net8.0-windows\SurfaceToolbox.Core.dll"
+$fallbackCoreDll = Join-Path $rootDir "src\SurfaceToolbox.Core\bin\Release\net8.0-windows\SurfaceToolbox.Core.dll"
 if (Test-Path $uiCoreDll) {
     $coreDll = $uiCoreDll
 } else {
@@ -23,16 +23,16 @@ if (-not (Test-Path $coreDll)) {
 }
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "   Surface Fan Control - Automated Verification Suite     " -ForegroundColor White
+Write-Host "   Surface Toolbox - Automated Verification Suite     " -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 [System.Reflection.Assembly]::LoadFrom($coreDll) | Out-Null
-Write-Host "[OK] Successfully loaded SurfaceFanControl.Core assembly." -ForegroundColor Green
+Write-Host "[OK] Successfully loaded SurfaceToolbox.Core assembly." -ForegroundColor Green
 
 # 1. Test Device Detection
 Write-Host ""
 Write-Host "--- Test 1: Surface Device Detection ---" -ForegroundColor Yellow
-$deviceInfo = [SurfaceFanControl.Core.Hardware.SurfaceDeviceDetector]::Detect()
+$deviceInfo = [SurfaceToolbox.Core.Hardware.SurfaceDeviceDetector]::Detect()
 Write-Host "  Manufacturer:               $($deviceInfo.Manufacturer)"
 Write-Host "  Model:                      $($deviceInfo.Model)"
 Write-Host "  Processor:                  $($deviceInfo.ProcessorName)"
@@ -50,7 +50,7 @@ try {
     # 2. Test Power Manager & Baseline Backup
     Write-Host ""
     Write-Host "--- Test 2: Power Manager & Baseline Backup ---" -ForegroundColor Yellow
-    $powerManager = [SurfaceFanControl.Core.Hardware.SurfacePowerManager]::new()
+    $powerManager = [SurfaceToolbox.Core.Hardware.SurfacePowerManager]::new()
     $backup = $powerManager.StockBackup
     Write-Host "  Captured Baseline Scheme:   $($backup.ActiveSchemeGuid)"
     Write-Host "  Baseline Effective Overlay: $($backup.EffectiveOverlayGuid)"
@@ -67,11 +67,11 @@ try {
     # 3. Test Power Mode Switching (Best Performance -> Quiet -> Stock Restore)
     Write-Host ""
     Write-Host "--- Test 3: Profile Switching & Live SMF Verification ---" -ForegroundColor Yellow
-    $monitor = [SurfaceFanControl.Core.Hardware.SurfaceThermalMonitor]::new($powerManager, 10000)
+    $monitor = [SurfaceToolbox.Core.Hardware.SurfaceThermalMonitor]::new($powerManager, 10000)
 
     # Test Best Performance Mode
     Write-Host "  Applying Best Performance Power Mode..."
-    $bestProfile = [SurfaceFanControl.Core.Profiles.CoolingProfile]::CreateBestPerformance()
+    $bestProfile = [SurfaceToolbox.Core.Profiles.CoolingProfile]::CreateBestPerformance()
     $okBest = $powerManager.ApplyProfile($bestProfile)
     if (-not $okBest) { Write-Error "Failed: Could not apply Best Performance power mode." }
     Start-Sleep -Milliseconds 350
@@ -81,7 +81,7 @@ try {
 
     # Test Quiet Mode
     Write-Host "  Applying Quiet Profile..."
-    $quietProfile = [SurfaceFanControl.Core.Profiles.CoolingProfile]::CreateQuiet()
+    $quietProfile = [SurfaceToolbox.Core.Profiles.CoolingProfile]::CreateQuiet()
     $okQuiet = $powerManager.ApplyProfile($quietProfile)
     if (-not $okQuiet) { Write-Error "Failed: Could not apply Quiet profile." }
     Start-Sleep -Milliseconds 350
@@ -107,7 +107,7 @@ try {
         $overlayBefore = $powerManager.GetEffectiveOverlayGuid()
         if (-not $powerManager.SetManualFanRpm(3000)) { Write-Host "[FAIL] Could not set a fan speed." -ForegroundColor Red; exit 1 }
         if ($powerManager.GetEffectiveOverlayGuid() -ne $overlayBefore) { Write-Host "[FAIL] Setting a fan speed changed the power mode." -ForegroundColor Red; exit 1 }
-        $betterProfile = [SurfaceFanControl.Core.Profiles.CoolingProfile]::CreateBetterPerformance()
+        $betterProfile = [SurfaceToolbox.Core.Profiles.CoolingProfile]::CreateBetterPerformance()
         if (-not $powerManager.ApplyProfile($betterProfile)) { Write-Host "[FAIL] Could not apply Better Performance power mode." -ForegroundColor Red; exit 1 }
         if ($powerManager.ActiveTargetRpm -ne 3000) { Write-Host "[FAIL] Changing the power mode dropped the fan speed target (got $($powerManager.ActiveTargetRpm))." -ForegroundColor Red; exit 1 }
         if (-not $powerManager.ResetFanSpeedOnly()) { Write-Host "[FAIL] Could not return the fan to automatic control." -ForegroundColor Red; exit 1 }
