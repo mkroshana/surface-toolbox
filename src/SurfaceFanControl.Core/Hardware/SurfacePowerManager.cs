@@ -18,6 +18,7 @@ namespace SurfaceFanControl.Core.Hardware
         private volatile byte _activeSamFanProfile = 2;
         private volatile bool _keepAliveRpmActive;
         private bool _samModified;
+        private bool _powerModified;
         private bool _disposed;
 
         public event Action<CoolingProfile>? ProfileApplied;
@@ -165,6 +166,7 @@ namespace SurfaceFanControl.Core.Hardware
             Guid procThrottleMax = NativePower.GUID_PROCTHROTTLEMAX;
 
             // 1. Write legacy Surface Overlay AC / DC values & Processor Max Throttle
+            _powerModified = true;
             NativePower.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref overlaySubgroup, ref overlaySetting, profile.SurfaceOverlayAcIndex);
             NativePower.PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref overlaySubgroup, ref overlaySetting, profile.SurfaceOverlayDcIndex);
             NativePower.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref procSubgroup, ref procThrottleMax, profile.ProcThrottleMaxAc);
@@ -306,6 +308,7 @@ namespace SurfaceFanControl.Core.Hardware
                 ? parsedOverlay
                 : NativePower.GUID_OVERLAY_BALANCED;
             uint overlayResult = NativePower.PowerSetActiveOverlayScheme(ref stockOverlay);
+            _powerModified = false;
 
             lock (_fanLock)
             {
@@ -362,6 +365,15 @@ namespace SurfaceFanControl.Core.Hardware
             lock (_fanLock)
             {
                 if (_disposed) return;
+
+                // A profile applied this session also changed the power plan and overlay
+                // (e.g. Quiet's 99% processor cap). Put the stock baseline back so those do
+                // not outlive the app; this also returns the fan to automatic control.
+                if (_powerModified)
+                {
+                    RestoreStockSettings();
+                }
+
                 _disposed = true;
 
                 bool shouldResetSam = _keepAliveRpmActive || _samModified;
