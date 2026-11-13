@@ -73,6 +73,9 @@
             <TabItem Style="{StaticResource SidebarTabItem}" Header="Device" Tag="{StaticResource DeviceGeometry}">
                 <views:DevicePage DataContext="{Binding Device}" />
             </TabItem>
+            <TabItem Style="{StaticResource SidebarTabItem}" Header="Diagnostics" Tag="{StaticResource ReportGeometry}">
+                <views:DiagnosticsPage DataContext="{Binding Diagnostics}" />
+            </TabItem>
         </TabControl>
 
         <!-- 2. Footer with Status and Clean Developer Links -->

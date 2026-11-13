@@ -311,6 +311,9 @@ namespace SurfaceFanControl.UI.ViewModels
         /// <summary>Backs the Device page; the report is read when that page is first opened.</summary>
         public DeviceViewModel Device { get; } = new DeviceViewModel();
 
+        /// <summary>Backs the Diagnostics page.</summary>
+        public DiagnosticsViewModel Diagnostics { get; } = new DiagnosticsViewModel();
+
         public ICommand SelectQuietCommand { get; }
         public ICommand SelectBalancedCommand { get; }
         public ICommand SelectBetterPerformanceCommand { get; }

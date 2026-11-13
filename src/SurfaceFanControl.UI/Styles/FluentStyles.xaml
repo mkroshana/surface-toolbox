@@ -104,6 +104,11 @@
         M4 5h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V7a2 2 0 012-2zM4 7v10h16V7H4zM15.5 13.5h3v2h-3v-2z
     </Geometry>
 
+    <!-- Report: a document with a folded corner and lines of text -->
+    <Geometry x:Key="ReportGeometry">
+        M6 2h9l5 5v13a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2zM14 3.5V8h4.5L14 3.5zM7 12h10v2H7v-2zM7 16h7v2H7v-2z
+    </Geometry>
+
     <!-- Profile Card Button Style -->
     <Style x:Key="ProfileCardButton" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource CardBackground}" />
