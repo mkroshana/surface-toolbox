@@ -13,8 +13,11 @@ namespace SurfaceFanControl.Core.Hardware
         private StockSettingsBackup _stockBackup = new();
         private readonly string _backupFilePath;
         private readonly SurfaceSamClient _samClient;
+        private readonly object _fanLock = new();
         private volatile ushort _activeTargetRpm;
+        private volatile byte _activeSamFanProfile = 2;
         private volatile bool _keepAliveRpmActive;
+        private bool _samModified;
         private bool _disposed;
 
         public event Action<CoolingProfile>? ProfileApplied;
@@ -38,6 +41,15 @@ namespace SurfaceFanControl.Core.Hardware
         public ushort ActiveTargetRpm => _activeTargetRpm;
 
         public bool IsDirectSamAvailable => _samClient.IsDirectSamAvailable;
+
+        public Guid GetEffectiveOverlayGuid()
+        {
+            if (NativePower.PowerGetEffectiveOverlayScheme(out Guid effectiveOverlay) == NativePower.ERROR_SUCCESS)
+            {
+                return effectiveOverlay;
+            }
+            return NativePower.GUID_OVERLAY_BALANCED;
+        }
 
         public void Initialize()
         {
@@ -164,13 +176,41 @@ namespace SurfaceFanControl.Core.Hardware
             uint overlayResult = NativePower.PowerSetActiveOverlayScheme(ref overlayGuid);
 
             // 3. Direct SAM hardware fan control (when running elevated)
-            _activeTargetRpm = profile.TargetFanRpm;
-            _keepAliveRpmActive = profile.TargetFanRpm > 0;
             bool samApplied = false;
-            if (_samClient.IsDirectSamAvailable)
+            lock (_fanLock)
             {
-                _samClient.TrySetFanProfile(profile.SamFanProfile);
-                samApplied = _samClient.TrySetFanRpm(profile.TargetFanRpm);
+                if (_disposed)
+                    return false;
+
+                if (_samClient.IsDirectSamAvailable)
+                {
+                    bool profileSet = _samClient.TrySetFanProfile(profile.SamFanProfile);
+                    bool rpmSet = _samClient.TrySetFanRpm(profile.TargetFanRpm);
+                    samApplied = profileSet || rpmSet;
+                    if (samApplied)
+                    {
+                        _samModified = true;
+                    }
+
+                    if (rpmSet && profile.TargetFanRpm > 0)
+                    {
+                        _activeTargetRpm = profile.TargetFanRpm;
+                        _activeSamFanProfile = profile.SamFanProfile;
+                        _keepAliveRpmActive = true;
+                    }
+                    else
+                    {
+                        _activeTargetRpm = 0;
+                        _activeSamFanProfile = 2;
+                        _keepAliveRpmActive = false;
+                    }
+                }
+                else
+                {
+                    _activeTargetRpm = 0;
+                    _activeSamFanProfile = 2;
+                    _keepAliveRpmActive = false;
+                }
             }
 
             if (overlayResult == NativePower.ERROR_SUCCESS || schemeResult == NativePower.ERROR_SUCCESS || samApplied)
@@ -184,51 +224,99 @@ namespace SurfaceFanControl.Core.Hardware
 
         public bool SetManualFanRpm(ushort targetRpm)
         {
-            var manualProfile = CoolingProfile.CreateManual(targetRpm);
+            ushort effectiveRpm = targetRpm == 0
+                ? (ushort)0
+                : Math.Clamp(targetRpm, SurfaceSamClient.MinManualFanRpm, SurfaceSamClient.MaxManualFanRpm);
+            var manualProfile = CoolingProfile.CreateManual(effectiveRpm);
             return ApplyProfile(manualProfile);
+        }
+
+        public bool ResetFanSpeedOnly()
+        {
+            lock (_fanLock)
+            {
+                if (_disposed)
+                    return false;
+
+                _keepAliveRpmActive = false;
+                _activeTargetRpm = 0;
+
+                if (!_samClient.IsDirectSamAvailable)
+                    return false;
+
+                bool rpmOk = _samClient.TrySetFanRpm(0);
+                _samClient.TrySetFanProfile(2);
+                if (rpmOk)
+                {
+                    _samModified = true;
+                }
+                return rpmOk;
+            }
         }
 
         public void MaintainFanTargetIfNeeded()
         {
-            if (_keepAliveRpmActive && _activeTargetRpm > 0 && _samClient.IsDirectSamAvailable)
+            lock (_fanLock)
             {
-                _samClient.TrySetFanRpm(_activeTargetRpm);
+                if (_disposed)
+                    return;
+
+                if (_keepAliveRpmActive && _activeTargetRpm > 0 && _samClient.IsDirectSamAvailable)
+                {
+                    _samClient.TrySetFanProfile(_activeSamFanProfile);
+                    _samClient.TrySetFanRpm(_activeTargetRpm);
+                }
             }
         }
 
         public bool RestoreStockSettings()
         {
             RefreshActiveScheme();
-            Guid scheme = _activeSchemeGuid;
+            Guid scheme = Guid.TryParse(_stockBackup.ActiveSchemeGuid, out Guid parsedScheme) && parsedScheme != Guid.Empty
+                ? parsedScheme
+                : _activeSchemeGuid;
             Guid overlaySubgroup = NativePower.GUID_SURFACE_OVERLAY_SUBGROUP;
             Guid overlaySetting = NativePower.GUID_SURFACE_OVERLAY_SETTING;
             Guid procSubgroup = NativePower.GUID_PROCESSOR_SUBGROUP;
             Guid procThrottleMax = NativePower.GUID_PROCTHROTTLEMAX;
+            Guid procThrottleMin = NativePower.GUID_PROCTHROTTLEMIN;
 
-            // Restore from backup (fallback to OEM defaults: overlay 1/2, throttle 100/100)
+            // Restore from backup (fallback to OEM defaults: overlay 1/2, throttle 100/100, min throttle 5/1)
             uint targetOverlayAc = _stockBackup.SurfaceOverlayAcIndex > 0 ? _stockBackup.SurfaceOverlayAcIndex : 1;
             uint targetOverlayDc = _stockBackup.SurfaceOverlayDcIndex > 0 ? _stockBackup.SurfaceOverlayDcIndex : 2;
             uint targetThrottleMaxAc = _stockBackup.ProcThrottleMaxAc > 0 ? _stockBackup.ProcThrottleMaxAc : 100;
             uint targetThrottleMaxDc = _stockBackup.ProcThrottleMaxDc > 0 ? _stockBackup.ProcThrottleMaxDc : 100;
+            uint targetThrottleMinAc = _stockBackup.ProcThrottleMinAc <= 100 ? _stockBackup.ProcThrottleMinAc : 5;
+            uint targetThrottleMinDc = _stockBackup.ProcThrottleMinDc <= 100 ? _stockBackup.ProcThrottleMinDc : 1;
 
             NativePower.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref overlaySubgroup, ref overlaySetting, targetOverlayAc);
             NativePower.PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref overlaySubgroup, ref overlaySetting, targetOverlayDc);
             NativePower.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref procSubgroup, ref procThrottleMax, targetThrottleMaxAc);
             NativePower.PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref procSubgroup, ref procThrottleMax, targetThrottleMaxDc);
+            NativePower.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref procSubgroup, ref procThrottleMin, targetThrottleMinAc);
+            NativePower.PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref procSubgroup, ref procThrottleMin, targetThrottleMinDc);
 
             uint result = NativePower.PowerSetActiveScheme(IntPtr.Zero, ref scheme);
+            if (result == NativePower.ERROR_SUCCESS)
+            {
+                _activeSchemeGuid = scheme;
+            }
 
             Guid stockOverlay = Guid.TryParse(_stockBackup.EffectiveOverlayGuid, out Guid parsedOverlay)
                 ? parsedOverlay
                 : NativePower.GUID_OVERLAY_BALANCED;
             uint overlayResult = NativePower.PowerSetActiveOverlayScheme(ref stockOverlay);
 
-            _keepAliveRpmActive = false;
-            _activeTargetRpm = 0;
-            if (_samClient.IsDirectSamAvailable)
+            lock (_fanLock)
             {
-                _samClient.TrySetFanRpm(0);
-                _samClient.TrySetFanProfile(2);
+                _keepAliveRpmActive = false;
+                _activeTargetRpm = 0;
+                if (_samClient.IsDirectSamAvailable)
+                {
+                    _samClient.TrySetFanRpm(0);
+                    _samClient.TrySetFanProfile(2);
+                }
+                _samModified = false;
             }
 
             if (result == NativePower.ERROR_SUCCESS || overlayResult == NativePower.ERROR_SUCCESS)
@@ -271,16 +359,24 @@ namespace SurfaceFanControl.Core.Hardware
 
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
-
-            if (_keepAliveRpmActive && _samClient.IsDirectSamAvailable)
+            lock (_fanLock)
             {
-                _samClient.TrySetFanRpm(0);
-                _samClient.TrySetFanProfile(2);
-            }
+                if (_disposed) return;
+                _disposed = true;
 
-            _samClient.Dispose();
+                bool shouldResetSam = _keepAliveRpmActive || _samModified;
+                _keepAliveRpmActive = false;
+                _activeTargetRpm = 0;
+                _samModified = false;
+
+                if (shouldResetSam && _samClient.IsDirectSamAvailable)
+                {
+                    _samClient.TrySetFanRpm(0);
+                    _samClient.TrySetFanProfile(2);
+                }
+
+                _samClient.Dispose();
+            }
         }
     }
 }

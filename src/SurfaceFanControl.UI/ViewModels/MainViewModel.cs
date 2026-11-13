@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -25,40 +26,44 @@ namespace SurfaceFanControl.UI.ViewModels
         private int _targetFanRpm;
         private int _manualSliderRpm = 3400;
         private int _smfFanProfile = 2;
-        private double _pl1Watts = 21;
+        private double _pl1Watts = 13;
         private double _pl2Watts = 28;
         private bool _isDirectSamAvailable;
         private string _powerSourceText = "Detecting...";
         private string _statusMessage;
         private CoolingProfile _activeProfile;
         private bool _isStockRestored;
-        private bool _disposed;
+        private volatile bool _disposed;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
         public MainViewModel()
         {
+            Zones = new ObservableCollection<ThermalZoneInfo>();
+
             _powerManager = new SurfacePowerManager();
-            _thermalMonitor = new SurfaceThermalMonitor(_powerManager, 1000);
             _profileManager = new ProfileManager(_powerManager);
             _deviceInfo = SurfaceDeviceDetector.Detect();
 
             _activeProfile = _profileManager.ActiveProfile;
             _isDirectSamAvailable = _powerManager.IsDirectSamAvailable;
+            _targetFanRpm = _powerManager.ActiveTargetRpm;
             _statusMessage = _isDirectSamAvailable
                 ? "Direct SAM Hardware Fan Control Active"
                 : "SMF Overlay Control Active (Run as Administrator for Direct RPM Control)";
-
-            Zones = new ObservableCollection<ThermalZoneInfo>();
 
             SelectQuietCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.Quiet));
             SelectBalancedCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.Balanced));
             SelectTurboCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.Turbo));
             ApplyManualRpmCommand = new RelayCommand(_ => ApplyManualRpm());
+            ResetFanOnlyCommand = new RelayCommand(_ => ResetFanOnly());
             RestoreStockCommand = new RelayCommand(_ => RestoreStock());
+            OpenGitHubCommand = new RelayCommand(_ => OpenExternalLink("https://github.com/mkroshana"));
+            OpenEmailCommand = new RelayCommand(_ => OpenExternalLink("mailto:mkroshana@gmail.com"));
 
-            _thermalMonitor.SnapshotUpdated += OnSnapshotUpdated;
             _profileManager.ActiveProfileChanged += OnProfileChanged;
+            _thermalMonitor = new SurfaceThermalMonitor(_powerManager, 1000);
+            _thermalMonitor.SnapshotUpdated += OnSnapshotUpdated;
         }
 
         public string DeviceName => string.IsNullOrWhiteSpace(_deviceInfo.Model) ? "Surface Pro 9" : _deviceInfo.Model;
@@ -119,8 +124,10 @@ namespace SurfaceFanControl.UI.ViewModels
             }
         }
 
-        public string FanStateSubtitle => _targetFanRpm > 0
-            ? $"Target {_targetFanRpm} RPM (SAM Direct)"
+        public string FanStateSubtitle => _isDirectSamAvailable && _targetFanRpm > 0
+            ? (_currentFanRpm > _targetFanRpm + 350
+                ? $"Target {_targetFanRpm} RPM (EC Thermal Floor)"
+                : $"Target {_targetFanRpm} RPM (SAM Direct)")
             : $"Auto Curve (SMF Profile {_smfFanProfile})";
 
         public int ManualSliderRpm
@@ -128,8 +135,26 @@ namespace SurfaceFanControl.UI.ViewModels
             get => _manualSliderRpm;
             set
             {
-                int snapped = (int)(Math.Round(value / 100.0) * 100);
-                if (SetField(ref _manualSliderRpm, snapped))
+                int rounded = (int)(Math.Round(value / 100.0) * 100);
+                int normalized;
+                if (rounded <= 0)
+                {
+                    normalized = 0;
+                }
+                else if (rounded < SurfaceSamClient.MinManualFanRpm)
+                {
+                    // When dragging up from 0, jump to MinManualFanRpm (2000 RPM).
+                    // When dragging down below 2000 RPM, snap to 0 if <= 1000, else 2000 RPM.
+                    normalized = _manualSliderRpm == 0 || rounded > 1000
+                        ? SurfaceSamClient.MinManualFanRpm
+                        : 0;
+                }
+                else
+                {
+                    normalized = Math.Min(rounded, (int)SurfaceSamClient.MaxManualFanRpm);
+                }
+
+                if (SetField(ref _manualSliderRpm, normalized))
                 {
                     OnPropertyChanged(nameof(ManualSliderRpmFormatted));
                 }
@@ -188,6 +213,7 @@ namespace SurfaceFanControl.UI.ViewModels
                 if (SetField(ref _isDirectSamAvailable, value))
                 {
                     OnPropertyChanged(nameof(HardwareModeBadgeText));
+                    OnPropertyChanged(nameof(FanStateSubtitle));
                 }
             }
         }
@@ -210,7 +236,7 @@ namespace SurfaceFanControl.UI.ViewModels
         }
 
         public bool IsQuietActive => ActiveProfile.Type == CoolingProfileType.Quiet;
-        public bool IsBalancedActive => ActiveProfile.Type == CoolingProfileType.Balanced;
+        public bool IsBalancedActive => ActiveProfile.Type == CoolingProfileType.Balanced || ActiveProfile.Type == CoolingProfileType.StockReset;
         public bool IsTurboActive => ActiveProfile.Type == CoolingProfileType.Turbo;
         public bool IsManualActive => ActiveProfile.Type == CoolingProfileType.Manual;
 
@@ -226,7 +252,10 @@ namespace SurfaceFanControl.UI.ViewModels
         public ICommand SelectBalancedCommand { get; }
         public ICommand SelectTurboCommand { get; }
         public ICommand ApplyManualRpmCommand { get; }
+        public ICommand ResetFanOnlyCommand { get; }
         public ICommand RestoreStockCommand { get; }
+        public ICommand OpenGitHubCommand { get; }
+        public ICommand OpenEmailCommand { get; }
 
         public ProfileManager ProfileManager => _profileManager;
 
@@ -235,6 +264,16 @@ namespace SurfaceFanControl.UI.ViewModels
             bool ok = _profileManager.SetProfile(type);
             if (ok)
             {
+                TargetFanRpm = _powerManager.ActiveTargetRpm;
+                if (type == CoolingProfileType.Turbo)
+                {
+                    ManualSliderRpm = 4200;
+                }
+                else if (_manualSliderRpm == 0)
+                {
+                    ManualSliderRpm = 3400;
+                }
+
                 var active = _profileManager.ActiveProfile;
                 if (active.TargetFanRpm > 0 && !_powerManager.IsDirectSamAvailable)
                 {
@@ -258,15 +297,22 @@ namespace SurfaceFanControl.UI.ViewModels
 
         public void ApplyManualRpm()
         {
-            ushort target = (ushort)Math.Clamp(_manualSliderRpm, 0, 5000);
+            if (!_powerManager.IsDirectSamAvailable)
+            {
+                StatusMessage = "Administrator privileges required for direct SAM RPM override.";
+                return;
+            }
+
+            ushort target = (ushort)Math.Clamp(_manualSliderRpm, 0, SurfaceSamClient.MaxManualFanRpm);
             bool ok = _profileManager.SetManualRpm(target);
             if (ok)
             {
-                StatusMessage = _powerManager.IsDirectSamAvailable
-                    ? (target > 0
-                        ? $"Manual Fan Speed Set to {target} RPM (SAM Direct)"
-                        : "Fan Returned to Automatic SAM Curve (0 RPM Override)")
-                    : "Administrator privileges required for direct SAM RPM override.";
+                ushort effectiveRpm = _profileManager.ActiveProfile.TargetFanRpm;
+                ManualSliderRpm = effectiveRpm;
+                TargetFanRpm = _powerManager.ActiveTargetRpm;
+                StatusMessage = effectiveRpm > 0
+                    ? $"Manual Fan Speed Set to {effectiveRpm} RPM (SAM Direct)"
+                    : "Fan Returned to Automatic SAM Curve (0 RPM Override)";
                 IsStockRestored = false;
             }
             else
@@ -275,11 +321,49 @@ namespace SurfaceFanControl.UI.ViewModels
             }
         }
 
+        public void ResetFanOnly()
+        {
+            bool ok = _profileManager.ResetFanSpeedOnly();
+            if (ok)
+            {
+                ManualSliderRpm = 0;
+                TargetFanRpm = 0;
+                StatusMessage = _powerManager.IsDirectSamAvailable
+                    ? "Fan speed reset to automatic SAM control (0 RPM override; power limits unchanged)"
+                    : "Fan target reset (Admin required for direct SAM command; power limits unchanged)";
+            }
+            else
+            {
+                StatusMessage = "Failed to reset fan speed.";
+            }
+        }
+
+        public void OpenExternalLink(string uri)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = uri,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Could not open link: {ex.Message}";
+            }
+        }
+
         public void RestoreStock()
         {
             bool ok = _profileManager.RestoreStock();
             if (ok)
             {
+                TargetFanRpm = _powerManager.ActiveTargetRpm;
+                if (_manualSliderRpm == 0)
+                {
+                    ManualSliderRpm = 3400;
+                }
                 StatusMessage = "OEM Stock Settings & Automatic SAM Fan Curve Restored";
                 IsStockRestored = true;
             }
@@ -291,8 +375,12 @@ namespace SurfaceFanControl.UI.ViewModels
 
         private void OnSnapshotUpdated(SystemThermalSnapshot snapshot)
         {
+            if (_disposed) return;
+
             System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
             {
+                if (_disposed) return;
+
                 CurrentPeakTemp = snapshot.PeakTemperatureCelsius;
                 CurrentAvgTemp = snapshot.AverageTemperatureCelsius;
                 CpuFrequency = snapshot.CpuFrequencyMhz;
@@ -329,11 +417,21 @@ namespace SurfaceFanControl.UI.ViewModels
 
         private void OnProfileChanged(CoolingProfile profile)
         {
-            System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                dispatcher.InvokeAsync(() =>
+                {
+                    if (_disposed) return;
+                    ActiveProfile = profile;
+                    TargetFanRpm = _powerManager.ActiveTargetRpm;
+                });
+            }
+            else
             {
                 ActiveProfile = profile;
-                TargetFanRpm = profile.TargetFanRpm;
-            });
+                TargetFanRpm = _powerManager.ActiveTargetRpm;
+            }
         }
 
         protected bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

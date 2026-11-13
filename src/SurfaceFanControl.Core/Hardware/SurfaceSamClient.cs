@@ -16,6 +16,9 @@ namespace SurfaceFanControl.Core.Hardware
         private const uint CM_GET_DEVICE_INTERFACE_LIST_PRESENT = 0x00000000;
         private const uint CR_SUCCESS = 0x00000000;
 
+        public const ushort MinManualFanRpm = 2000;
+        public const ushort MaxManualFanRpm = 4800;
+
         public static readonly Guid GUID_DEVINTERFACE_SURFACE_SERIAL_HUB = new("99bbc337-05d6-4819-b648-39589febb93e");
         public static readonly Guid GUID_DEVINTERFACE_SMF_CORE           = new("b98aea2e-7ee8-403c-8232-f0d48d5dd338");
 
@@ -30,6 +33,8 @@ namespace SurfaceFanControl.Core.Hardware
         private readonly object _syncRoot = new();
         private IntPtr _sshHandle = IntPtr.Zero;
         private IntPtr _smfHandle = IntPtr.Zero;
+        private bool _sshOpenFailed;
+        private bool _smfOpenFailed;
         private bool _disposed;
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -129,13 +134,17 @@ namespace SurfaceFanControl.Core.Hardware
 
         public bool TrySetFanRpm(ushort targetRpm, byte fanInstance = 1)
         {
+            ushort effectiveRpm = targetRpm == 0
+                ? (ushort)0
+                : Math.Clamp(targetRpm, MinManualFanRpm, MaxManualFanRpm);
+
             lock (_syncRoot)
             {
                 if (!EnsureSshHandle())
                     return false;
 
-                byte lo = (byte)(targetRpm & 0xFF);
-                byte hi = (byte)((targetRpm >> 8) & 0xFF);
+                byte lo = (byte)(effectiveRpm & 0xFF);
+                byte hi = (byte)((effectiveRpm >> 8) & 0xFF);
                 // TC=0x05 (Fan), TID=0x01, IID=fanInstance, HasResponse=0x00, CID=0x0B, PayloadLen=0x0002
                 byte[] inBuf = { 0x05, 0x01, fanInstance, 0x00, 0x0B, 0x02, 0x00, lo, hi };
                 return DeviceIoControl(_sshHandle, IOCTL_SSH_SEND_COMMAND_TO_TARGET, inBuf, (uint)inBuf.Length, null, 0, out _, IntPtr.Zero);
@@ -170,11 +179,24 @@ namespace SurfaceFanControl.Core.Hardware
         {
             pl1Watts = 0;
             pl2Watts = 0;
-            bool ok1 = TryReadSmfChannel(GUID_SMF_POWER_LIMITS, 0x01, out long pl1Mw);
-            bool ok2 = TryReadSmfChannel(GUID_SMF_POWER_LIMITS, 0x02, out long pl2Mw);
-            if (ok1 && pl1Mw > 0) pl1Watts = Math.Round(pl1Mw / 1000.0, 1);
-            if (ok2 && pl2Mw > 0) pl2Watts = Math.Round(pl2Mw / 1000.0, 1);
-            return ok1 || ok2;
+            bool ok1 = TryReadSmfChannel(GUID_SMF_POWER_LIMITS, 0x01, out long rawCh1Mw);
+            bool ok2 = TryReadSmfChannel(GUID_SMF_POWER_LIMITS, 0x02, out long rawCh2Mw);
+            double w1 = (ok1 && rawCh1Mw > 0) ? Math.Round(rawCh1Mw / 1000.0, 1) : 0;
+            double w2 = (ok2 && rawCh2Mw > 0) ? Math.Round(rawCh2Mw / 1000.0, 1) : 0;
+
+            if (w1 > 0 && w2 > 0)
+            {
+                pl1Watts = Math.Min(w1, w2);
+                pl2Watts = Math.Max(w1, w2);
+            }
+            else
+            {
+                // Channel 0x02 is sustained O_CPU_AVG (PL1); channel 0x01 is burst limit (PL2).
+                pl1Watts = w2;
+                pl2Watts = w1;
+            }
+
+            return w1 > 0 || w2 > 0;
         }
 
         public bool TryReadPackagePower(out double packageWatts)
@@ -215,6 +237,9 @@ namespace SurfaceFanControl.Core.Hardware
 
         private bool EnsureSshHandle()
         {
+            if (_disposed || _sshOpenFailed)
+                return false;
+
             if (IsValidHandle(_sshHandle))
                 return true;
 
@@ -227,11 +252,18 @@ namespace SurfaceFanControl.Core.Hardware
             }
 
             _sshHandle = OpenDevice(FallbackSshPath);
-            return IsValidHandle(_sshHandle);
+            if (IsValidHandle(_sshHandle))
+                return true;
+
+            _sshOpenFailed = true;
+            return false;
         }
 
         private bool EnsureSmfHandle()
         {
+            if (_disposed || _smfOpenFailed)
+                return false;
+
             if (IsValidHandle(_smfHandle))
                 return true;
 
@@ -244,7 +276,11 @@ namespace SurfaceFanControl.Core.Hardware
             }
 
             _smfHandle = OpenDevice(FallbackSmfPath);
-            return IsValidHandle(_smfHandle);
+            if (IsValidHandle(_smfHandle))
+                return true;
+
+            _smfOpenFailed = true;
+            return false;
         }
 
         private static IntPtr OpenDevice(string path)

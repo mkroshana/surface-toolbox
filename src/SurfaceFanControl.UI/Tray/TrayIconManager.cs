@@ -1,6 +1,9 @@
 using System;
+using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Forms;
 using SurfaceFanControl.Core.Profiles;
@@ -11,9 +14,15 @@ namespace SurfaceFanControl.UI.Tray
 {
     public class TrayIconManager : IDisposable
     {
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool DestroyIcon(IntPtr hIcon);
+
         private readonly NotifyIcon _notifyIcon;
         private readonly MainViewModel _viewModel;
         private readonly Window _mainWindow;
+        private readonly PropertyChangedEventHandler _viewModelPropertyChangedHandler;
+        private ContextMenuStrip? _contextMenu;
+        private Font? _headerFont;
         private Icon? _generatedIcon;
 
         public TrayIconManager(MainViewModel viewModel, Window mainWindow)
@@ -21,7 +30,7 @@ namespace SurfaceFanControl.UI.Tray
             _viewModel = viewModel;
             _mainWindow = mainWindow;
 
-            _generatedIcon = CreateMinimalistFanIcon();
+            _generatedIcon = LoadTrayIcon();
 
             _notifyIcon = new NotifyIcon
             {
@@ -34,16 +43,16 @@ namespace SurfaceFanControl.UI.Tray
 
             _notifyIcon.DoubleClick += (s, e) => ToggleMainWindow();
 
-            _viewModel.PropertyChanged += (s, e) =>
+            _viewModelPropertyChangedHandler = (s, e) =>
             {
                 if (e.PropertyName == nameof(MainViewModel.CurrentPeakTemp) ||
                     e.PropertyName == nameof(MainViewModel.CurrentFanRpm) ||
-                    e.PropertyName == nameof(MainViewModel.ActiveProfile) ||
-                    e.PropertyName == nameof(MainViewModel.PowerSourceText))
+                    e.PropertyName == nameof(MainViewModel.ActiveProfile))
                 {
                     UpdateTooltip();
                 }
             };
+            _viewModel.PropertyChanged += _viewModelPropertyChangedHandler;
 
             UpdateTooltip();
         }
@@ -52,8 +61,9 @@ namespace SurfaceFanControl.UI.Tray
         {
             var menu = new ContextMenuStrip();
 
-            var header = new ToolStripMenuItem("Surface Pro 9 Fan Control") { Enabled = false };
-            header.Font = new Font(header.Font, System.Drawing.FontStyle.Bold);
+            var header = new ToolStripMenuItem($"Surface Fan Control — {_viewModel.DeviceName}") { Enabled = false };
+            _headerFont = new Font(header.Font, System.Drawing.FontStyle.Bold);
+            header.Font = _headerFont;
             menu.Items.Add(header);
             menu.Items.Add(new ToolStripSeparator());
 
@@ -67,7 +77,9 @@ namespace SurfaceFanControl.UI.Tray
 
             menu.Items.Add(new ToolStripSeparator());
 
+            var resetFanItem = new ToolStripMenuItem("Reset Fan Speed Only (Auto)", null, (s, e) => _viewModel.ResetFanOnly());
             var stockItem = new ToolStripMenuItem("Reset to Stock Defaults", null, (s, e) => _viewModel.RestoreStock());
+            menu.Items.Add(resetFanItem);
             menu.Items.Add(stockItem);
 
             menu.Items.Add(new ToolStripSeparator());
@@ -78,6 +90,7 @@ namespace SurfaceFanControl.UI.Tray
             menu.Items.Add(showItem);
             menu.Items.Add(exitItem);
 
+            _contextMenu = menu;
             _notifyIcon.ContextMenuStrip = menu;
         }
 
@@ -117,7 +130,44 @@ namespace SurfaceFanControl.UI.Tray
         private void ExitApplication()
         {
             _notifyIcon.Visible = false;
+            if (_mainWindow is Views.MainWindow mainWindow)
+            {
+                mainWindow.PrepareForExplicitExit();
+            }
+            _mainWindow.Close();
             Application.Current.Shutdown();
+        }
+
+        private static Icon LoadTrayIcon()
+        {
+            try
+            {
+                using var stream = Application.GetResourceStream(new Uri("pack://application:,,,/Assets/app.ico"))?.Stream;
+                if (stream != null)
+                {
+                    return new Icon(stream);
+                }
+            }
+            catch { }
+
+            try
+            {
+                string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "app.ico");
+                if (File.Exists(icoPath))
+                {
+                    return new Icon(icoPath, 32, 32);
+                }
+
+                var procPath = Environment.ProcessPath;
+                if (!string.IsNullOrEmpty(procPath) && File.Exists(procPath))
+                {
+                    var extracted = Icon.ExtractAssociatedIcon(procPath);
+                    if (extracted != null) return extracted;
+                }
+            }
+            catch { }
+
+            return CreateMinimalistFanIcon();
         }
 
         private static Icon CreateMinimalistFanIcon()
@@ -128,38 +178,49 @@ namespace SurfaceFanControl.UI.Tray
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.Clear(Color.Transparent);
 
-                using var pen = new Pen(Color.FromArgb(0, 120, 215), 2.5f);
-                g.DrawEllipse(pen, 3, 3, 26, 26);
+                using var pen = new Pen(Color.FromArgb(0, 120, 215), 2.2f);
+                g.DrawEllipse(pen, 2, 2, 28, 28);
 
-                using var hubBrush = new SolidBrush(Color.White);
-                g.FillEllipse(hubBrush, 13, 13, 6, 6);
+                using var hubBrush = new SolidBrush(Color.FromArgb(15, 23, 42));
+                g.FillEllipse(hubBrush, 12, 12, 8, 8);
 
-                using var bladeBrush = new SolidBrush(Color.FromArgb(220, 240, 255));
-                for (int i = 0; i < 3; i++)
+                using var bladeBrush = new SolidBrush(Color.FromArgb(96, 165, 250));
+                for (int i = 0; i < 4; i++)
                 {
-                    float angle = i * 120f;
+                    float angle = i * 90f;
                     var state = g.Save();
                     g.TranslateTransform(16, 16);
                     g.RotateTransform(angle);
                     g.FillPolygon(bladeBrush, new PointF[]
                     {
                         new PointF(0, -3),
-                        new PointF(4, -10),
-                        new PointF(2, -12),
-                        new PointF(-2, -7)
+                        new PointF(5, -11),
+                        new PointF(2, -13),
+                        new PointF(-2, -6)
                     });
                     g.Restore(state);
                 }
+
+                using var hubRingPen = new Pen(Color.FromArgb(56, 189, 248), 1.2f);
+                g.DrawEllipse(hubRingPen, 12, 12, 8, 8);
+
+                using var dotBrush = new SolidBrush(Color.White);
+                g.FillEllipse(dotBrush, 14, 14, 4, 4);
             }
 
             IntPtr hIcon = bitmap.GetHicon();
-            return Icon.FromHandle(hIcon);
+            Icon managed = (Icon)Icon.FromHandle(hIcon).Clone();
+            DestroyIcon(hIcon);
+            return managed;
         }
 
         public void Dispose()
         {
+            _viewModel.PropertyChanged -= _viewModelPropertyChangedHandler;
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
+            _contextMenu?.Dispose();
+            _headerFont?.Dispose();
             _generatedIcon?.Dispose();
         }
     }

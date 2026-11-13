@@ -9,7 +9,33 @@ $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+function Resolve-DotNet {
+    $dotnetLocalDir = "$env:LOCALAPPDATA\Microsoft\dotnet"
+    $dotnetSystemDir = "C:\Program Files\dotnet"
+
+    if (Test-Path (Join-Path $dotnetLocalDir "dotnet.exe")) {
+        $env:DOTNET_ROOT = $dotnetLocalDir
+        if ($env:PATH -notlike "*$dotnetLocalDir*") {
+            $env:PATH = "$dotnetLocalDir;$env:PATH"
+        }
+        return (Join-Path $dotnetLocalDir "dotnet.exe")
+    } elseif (Test-Path (Join-Path $dotnetSystemDir "dotnet.exe")) {
+        $env:DOTNET_ROOT = $dotnetSystemDir
+        if ($env:PATH -notlike "*$dotnetSystemDir*") {
+            $env:PATH = "$dotnetSystemDir;$env:PATH"
+        }
+        return (Join-Path $dotnetSystemDir "dotnet.exe")
+    } else {
+        return "dotnet"
+    }
+}
+
 if ($RestoreStock) {
+    if (Get-Process -Name "SurfaceFanControl.UI" -ErrorAction SilentlyContinue) {
+        Write-Host "[*] Stopping running SurfaceFanControl.UI instance..." -ForegroundColor Yellow
+        Stop-Process -Name "SurfaceFanControl.UI" -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 300
+    }
     Write-Host "[*] Executing stock settings restore script..." -ForegroundColor Cyan
     & "$scriptDir\scripts\restore_stock_settings.ps1"
     exit 0
@@ -19,25 +45,21 @@ Write-Host "==========================================================" -Foregro
 Write-Host "         Surface Fan Control - Build Script               " -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-# Locate dotnet CLI with SDK
-if (Test-Path "$env:LOCALAPPDATA\Microsoft\dotnet\sdk") {
-    $env:DOTNET_ROOT = "$env:LOCALAPPDATA\Microsoft\dotnet"
-    $env:PATH = "$env:LOCALAPPDATA\Microsoft\dotnet;$env:PATH"
-    $dotnetCmd = "$env:LOCALAPPDATA\Microsoft\dotnet\dotnet.exe"
-} elseif (Test-Path "C:\Program Files\dotnet\sdk") {
-    $env:DOTNET_ROOT = "C:\Program Files\dotnet"
-    $env:PATH = "C:\Program Files\dotnet;$env:PATH"
-    $dotnetCmd = "C:\Program Files\dotnet\dotnet.exe"
-} else {
-    $dotnetCmd = "dotnet"
+if (Get-Process -Name "SurfaceFanControl.UI" -ErrorAction SilentlyContinue) {
+    Write-Host "[*] Stopping running SurfaceFanControl.UI instance..." -ForegroundColor Yellow
+    Stop-Process -Name "SurfaceFanControl.UI" -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 300
 }
 
-Write-Host "[*] Using dotnet: $dotnetCmd" -ForegroundColor Gray
-& $dotnetCmd --version
+# Locate dotnet CLI with SDK
+$dotnetExe = Resolve-DotNet
+
+Write-Host "[*] Using dotnet: $dotnetExe" -ForegroundColor Gray
+& $dotnetExe --version
 
 $slnPath = Join-Path $scriptDir "src\SurfaceFanControl.sln"
 Write-Host "[*] Building Solution ($Configuration): $slnPath..." -ForegroundColor Cyan
-& $dotnetCmd build $slnPath -c $Configuration
+& $dotnetExe build $slnPath -c $Configuration -p:Platform="Any CPU"
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Build failed with exit code $LASTEXITCODE."

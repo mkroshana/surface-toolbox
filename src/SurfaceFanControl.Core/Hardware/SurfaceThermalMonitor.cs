@@ -10,8 +10,8 @@ namespace SurfaceFanControl.Core.Hardware
     {
         private readonly Timer _timer;
         private readonly SurfacePowerManager _powerManager;
-        private bool _isDisposed;
-        private bool _isPolling;
+        private int _isDisposed;
+        private int _isPolling;
 
         public event Action<SystemThermalSnapshot>? SnapshotUpdated;
 
@@ -33,18 +33,29 @@ namespace SurfaceFanControl.Core.Hardware
         public SurfaceThermalMonitor(SurfacePowerManager powerManager, int pollIntervalMs = 1000)
         {
             _powerManager = powerManager;
-            _timer = new Timer(OnTimerTick, null, 500, pollIntervalMs);
+            _timer = new Timer(OnTimerTick, null, 50, pollIntervalMs);
         }
 
         private void OnTimerTick(object? state)
         {
-            if (_isDisposed || _isPolling) return;
-            _isPolling = true;
+            if (Volatile.Read(ref _isDisposed) != 0 || Interlocked.CompareExchange(ref _isPolling, 1, 0) != 0)
+                return;
 
             try
             {
+                if (Volatile.Read(ref _isDisposed) != 0)
+                    return;
+
                 _powerManager.MaintainFanTargetIfNeeded();
+
+                if (Volatile.Read(ref _isDisposed) != 0)
+                    return;
+
                 var snapshot = CaptureSnapshot();
+
+                if (Volatile.Read(ref _isDisposed) != 0)
+                    return;
+
                 SnapshotUpdated?.Invoke(snapshot);
             }
             catch
@@ -53,7 +64,7 @@ namespace SurfaceFanControl.Core.Hardware
             }
             finally
             {
-                _isPolling = false;
+                Interlocked.Exchange(ref _isPolling, 0);
             }
         }
 
@@ -76,36 +87,42 @@ namespace SurfaceFanControl.Core.Hardware
                 using var searcher = new ManagementObjectSearcher(
                     "root\\CIMV2",
                     "SELECT Name, Temperature, PercentPassiveLimit, ThrottleReasons FROM Win32_PerfFormattedData_Counters_ThermalZoneInformation");
+                using ManagementObjectCollection results = searcher.Get();
 
-                foreach (ManagementObject obj in searcher.Get())
+                foreach (ManagementObject obj in results)
                 {
-                    string name = obj["Name"]?.ToString() ?? string.Empty;
-                    if (string.Equals(name, "\\tpol", StringComparison.OrdinalIgnoreCase)) continue;
-
-                    double rawVal = Convert.ToDouble(obj["Temperature"] ?? 0);
-                    if (rawVal <= 0) continue;
-
-                    double tempCelsius = rawVal > 1000 ? (rawVal / 10.0 - 273.15) : (rawVal - 273.15);
-                    if (tempCelsius < 0 || tempCelsius > 125) continue;
-
-                    string cleanKey = name.Replace("\\", "").ToLowerInvariant();
-                    string friendlyName = ZoneLabels.TryGetValue(cleanKey, out var label) ? label : $"Thermal Zone {name}";
-
-                    var zone = new ThermalZoneInfo
+                    using (obj)
                     {
-                        Id = name,
-                        DisplayName = friendlyName,
-                        TemperatureCelsius = Math.Round(tempCelsius, 1),
-                        HighPrecisionRaw = rawVal,
-                        ThrottleReasons = Convert.ToDouble(obj["ThrottleReasons"] ?? 0)
-                    };
+                        string name = obj["Name"]?.ToString() ?? string.Empty;
+                        if (string.Equals(name, "\\tpol", StringComparison.OrdinalIgnoreCase)) continue;
 
-                    snapshot.Zones.Add(zone);
+                        double rawVal = Convert.ToDouble(obj["Temperature"] ?? 0);
+                        if (rawVal <= 0) continue;
 
-                    if (tempCelsius > maxTemp) maxTemp = tempCelsius;
-                    tempSum += tempCelsius;
-                    count++;
+                        double tempCelsius = rawVal > 1000 ? (rawVal / 10.0 - 273.15) : (rawVal - 273.15);
+                        if (tempCelsius < 0 || tempCelsius > 125) continue;
+
+                        string cleanKey = name.Replace("\\", "").ToLowerInvariant();
+                        string friendlyName = ZoneLabels.TryGetValue(cleanKey, out var label) ? label : $"Thermal Zone {name}";
+
+                        var zone = new ThermalZoneInfo
+                        {
+                            Id = name,
+                            DisplayName = friendlyName,
+                            TemperatureCelsius = Math.Round(tempCelsius, 1),
+                            HighPrecisionRaw = rawVal,
+                            ThrottleReasons = Convert.ToDouble(obj["ThrottleReasons"] ?? 0)
+                        };
+
+                        snapshot.Zones.Add(zone);
+
+                        if (tempCelsius > maxTemp) maxTemp = tempCelsius;
+                        tempSum += tempCelsius;
+                        count++;
+                    }
                 }
+
+                snapshot.Zones.Sort((a, b) => string.Compare(a.Id, b.Id, StringComparison.OrdinalIgnoreCase));
             }
             catch
             {
@@ -138,12 +155,16 @@ namespace SurfaceFanControl.Core.Hardware
                 using var cpuSearcher = new ManagementObjectSearcher(
                     "root\\CIMV2",
                     "SELECT PercentProcessorTime, ProcessorFrequency FROM Win32_PerfFormattedData_Counters_ProcessorInformation WHERE Name='_Total'");
+                using ManagementObjectCollection cpuResults = cpuSearcher.Get();
 
-                foreach (ManagementObject cpu in cpuSearcher.Get())
+                foreach (ManagementObject cpu in cpuResults)
                 {
-                    snapshot.CpuPerformancePercent = Math.Clamp(Convert.ToDouble(cpu["PercentProcessorTime"] ?? 0), 0, 100);
-                    snapshot.CpuFrequencyMhz = Convert.ToDouble(cpu["ProcessorFrequency"] ?? 0);
-                    break;
+                    using (cpu)
+                    {
+                        snapshot.CpuPerformancePercent = Math.Clamp(Convert.ToDouble(cpu["PercentProcessorTime"] ?? 0), 0, 100);
+                        snapshot.CpuFrequencyMhz = Convert.ToDouble(cpu["ProcessorFrequency"] ?? 0);
+                        break;
+                    }
                 }
             }
             catch { }
@@ -158,8 +179,9 @@ namespace SurfaceFanControl.Core.Hardware
 
         public void Dispose()
         {
-            if (_isDisposed) return;
-            _isDisposed = true;
+            if (Interlocked.Exchange(ref _isDisposed, 1) != 0)
+                return;
+
             _timer.Dispose();
         }
     }

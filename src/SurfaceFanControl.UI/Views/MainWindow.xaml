@@ -7,33 +7,34 @@
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
         Title="Surface Fan Control"
-        Height="760" Width="840"
-        MinHeight="720" MinWidth="780"
+        Icon="pack://application:,,,/SurfaceFanControl.UI;component/Assets/app.ico"
+        Height="820" Width="880"
+        MinHeight="780" MinWidth="840"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource AppBackground}"
         Foreground="{StaticResource TextPrimary}"
-        FontFamily="Segoe UI Variable Display, Segoe UI">
+        FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Variable">
 
-    <Grid Margin="24">
+    <Grid Margin="24,14,24,14">
         <Grid.RowDefinitions>
-            <!-- Header -->
+            <!-- 0. Header -->
             <RowDefinition Height="Auto" />
-            <!-- Hero Telemetry -->
+            <!-- 1. Hero Telemetry Dashboard -->
             <RowDefinition Height="Auto" />
-            <!-- Profiles Section -->
+            <!-- 2. Profiles Section -->
             <RowDefinition Height="Auto" />
-            <!-- Manual RPM Control Bar -->
+            <!-- 3. Manual Fan Speed Override Bar -->
             <RowDefinition Height="Auto" />
-            <!-- Stock Reset Bar -->
+            <!-- 4. Stock Reset Bar -->
             <RowDefinition Height="Auto" />
-            <!-- Detailed Sensors List -->
+            <!-- 5. Detailed Sensors List -->
             <RowDefinition Height="*" />
-            <!-- Footer -->
+            <!-- 6. Footer -->
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- 1. Header -->
-        <Border Grid.Row="0" Margin="0,0,0,18">
+        <!-- 0. Header -->
+        <Border Grid.Row="0" Margin="0,0,0,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -41,87 +42,116 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Surface Fan Control" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" />
-                        <Border Background="#1E3A8A" CornerRadius="6" Padding="8,2" Margin="12,2,0,0" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Modern Vector Fan Icon in Header -->
+                        <Path Data="{StaticResource FanGeometry}" Fill="{StaticResource AccentBluePrimary}" Width="24" Height="24" Stretch="Uniform" Margin="0,0,10,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Surface Fan Control" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
+                        <Border Background="#1E3A8A" CornerRadius="6" Padding="8,2" Margin="12,0,0,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding ActiveProfile.Name}" FontSize="12" FontWeight="SemiBold" Foreground="#60A5FA" />
                         </Border>
-                        <Border Background="#27272A" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="6" Padding="8,2" Margin="8,2,0,0" VerticalAlignment="Center">
+                        <Border Background="#26262D" BorderBrush="#3F3F4C" BorderThickness="1" CornerRadius="6" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding HardwareModeBadgeText}" FontSize="11" Foreground="{StaticResource TextSecondary}" />
                         </Border>
                     </StackPanel>
-                    <TextBlock Text="{Binding DeviceName}" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" />
+                    <TextBlock Text="{Binding DeviceName}" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="34,4,0,0" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Style="{StaticResource SecondaryButton}" Content="Minimize to Tray" Click="OnMinimizeToTrayClick" Margin="0,0,8,0" />
+                    <Button Style="{StaticResource SecondaryButton}" Content="Minimize to Tray" Click="OnMinimizeToTrayClick" />
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- 2. Hero Telemetry Dashboard -->
-        <Border Grid.Row="1" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="20,16" Margin="0,0,0,16">
+        <!-- 1. Hero Telemetry Dashboard -->
+        <Border Grid.Row="1" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16,12" Margin="0,0,0,10">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <!-- Main Temp & Fan Gauge -->
-                    <ColumnDefinition Width="260" />
+                    <!-- Left Hero Gauges (Peak Temp & Fan RPM) -->
+                    <ColumnDefinition Width="410" />
+                    <!-- Right Secondary Hardware Metrics (2x2 Grid) -->
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Primary Temp + Fan RPM -->
-                <Grid Grid.Column="0" VerticalAlignment="Center">
+                <!-- Left Hero Section: Spacious Side-by-Side Gauges -->
+                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="182" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Peak Temperature" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextTertiary}" />
-                        <TextBlock Text="{Binding CurrentPeakTempFormatted}" FontSize="32" FontWeight="Bold" Foreground="{StaticResource AccentBlue}" Margin="0,4,0,0" />
-                        <TextBlock Text="{Binding PowerSourceText}" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" />
-                    </StackPanel>
+                    <!-- Peak Temp Card -->
+                    <Border Grid.Column="0" Background="{StaticResource SubCardBackground}" BorderBrush="{StaticResource SubCardBorder}" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,10,0">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <Path Data="{StaticResource ThermometerGeometry}" Fill="{StaticResource AccentBlue}" Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBlock Text="Peak Temperature" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextTertiary}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding CurrentPeakTempFormatted}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource AccentBlue}" Margin="0,2,0,0" />
+                            <TextBlock Text="{Binding PowerSourceText}" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
 
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
-                        <TextBlock Text="Fan Tachometer" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextTertiary}" />
-                        <TextBlock Text="{Binding CurrentFanRpmFormatted}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource AccentGreen}" Margin="0,6,0,0" />
-                        <TextBlock Text="{Binding FanStateSubtitle}" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
+                    <!-- Fan RPM Card (Generous width to prevent any clipping) -->
+                    <Border Grid.Column="1" Background="{StaticResource SubCardBackground}" BorderBrush="{StaticResource SubCardBorder}" BorderThickness="1" CornerRadius="8" Padding="14,12">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <Path Data="{StaticResource TachometerGeometry}" Fill="{StaticResource AccentGreen}" Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBlock Text="Fan Tachometer" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextTertiary}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding CurrentFanRpmFormatted}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource AccentGreen}" Margin="0,2,0,0" />
+                            <TextBlock Text="{Binding FanStateSubtitle}" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
                 </Grid>
 
-                <!-- Secondary Hardware Metrics -->
-                <UniformGrid Grid.Column="1" Columns="4" Margin="16,0,0,0" VerticalAlignment="Center">
+                <!-- Right Secondary Metrics: 2x2 Grid with Plenty of Room -->
+                <UniformGrid Grid.Column="1" Rows="2" Columns="2" VerticalAlignment="Center">
                     <!-- Average Temp -->
-                    <Border Background="#1C1C20" CornerRadius="8" Padding="12,10" Margin="4">
+                    <Border Background="{StaticResource SubCardBackground}" BorderBrush="{StaticResource SubCardBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="4">
                         <StackPanel>
                             <TextBlock Text="Average Temp" FontSize="11" Foreground="{StaticResource TextSecondary}" />
-                            <TextBlock Text="{Binding CurrentAvgTempFormatted}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,4,0,0" />
+                            <TextBlock Text="{Binding CurrentAvgTempFormatted}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,3,0,0" />
                             <TextBlock Text="Active Sensors" FontSize="10" Foreground="{StaticResource TextTertiary}" Margin="0,2,0,0" />
                         </StackPanel>
                     </Border>
 
-                    <!-- Power Limits -->
-                    <Border Background="#1C1C20" CornerRadius="8" Padding="12,10" Margin="4">
-                        <StackPanel>
-                            <TextBlock Text="Power Limits" FontSize="11" Foreground="{StaticResource TextSecondary}" />
-                            <TextBlock Text="{Binding PowerLimitsFormatted}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,4,0,0" />
-                            <TextBlock Text="SMF PL1 / PL2" FontSize="10" Foreground="{StaticResource TextTertiary}" Margin="0,2,0,0" />
-                        </StackPanel>
+                    <!-- Power Limits (PL1 / PL2) -->
+                    <Border Background="{StaticResource SubCardBackground}" BorderBrush="{StaticResource SubCardBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Power Limits" FontSize="11" Foreground="{StaticResource TextSecondary}" />
+                                <TextBlock Text="{Binding PowerLimitsFormatted}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,3,0,0" />
+                                <TextBlock Text="SMF PL1 / PL2" FontSize="10" Foreground="{StaticResource TextTertiary}" Margin="0,2,0,0" />
+                            </StackPanel>
+                            <Path Grid.Column="1" Data="{StaticResource BoltGeometry}" Fill="{StaticResource AccentOrange}" Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Top" Margin="0,2,0,0" Opacity="0.8" />
+                        </Grid>
                     </Border>
 
-                    <!-- CPU Freq -->
-                    <Border Background="#1C1C20" CornerRadius="8" Padding="12,10" Margin="4">
-                        <StackPanel>
-                            <TextBlock Text="CPU Clock" FontSize="11" Foreground="{StaticResource TextSecondary}" />
-                            <TextBlock Text="{Binding CpuFrequencyFormatted}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,4,0,0" />
-                            <TextBlock Text="Core Frequency" FontSize="10" Foreground="{StaticResource TextTertiary}" Margin="0,2,0,0" />
-                        </StackPanel>
+                    <!-- CPU Clock -->
+                    <Border Background="{StaticResource SubCardBackground}" BorderBrush="{StaticResource SubCardBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="CPU Clock" FontSize="11" Foreground="{StaticResource TextSecondary}" />
+                                <TextBlock Text="{Binding CpuFrequencyFormatted}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,3,0,0" />
+                                <TextBlock Text="Core Frequency" FontSize="10" Foreground="{StaticResource TextTertiary}" Margin="0,2,0,0" />
+                            </StackPanel>
+                            <Path Grid.Column="1" Data="{StaticResource CpuGeometry}" Fill="{StaticResource AccentBlue}" Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Top" Margin="0,2,0,0" Opacity="0.8" />
+                        </Grid>
                     </Border>
 
                     <!-- CPU Load -->
-                    <Border Background="#1C1C20" CornerRadius="8" Padding="12,10" Margin="4">
+                    <Border Background="{StaticResource SubCardBackground}" BorderBrush="{StaticResource SubCardBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="4">
                         <StackPanel>
                             <TextBlock Text="CPU Load" FontSize="11" Foreground="{StaticResource TextSecondary}" />
-                            <TextBlock Text="{Binding CpuPerformanceFormatted}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,4,0,0" />
+                            <TextBlock Text="{Binding CpuPerformanceFormatted}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,3,0,0" />
                             <TextBlock Text="Utilization" FontSize="10" Foreground="{StaticResource TextTertiary}" Margin="0,2,0,0" />
                         </StackPanel>
                     </Border>
@@ -129,50 +159,69 @@
             </Grid>
         </Border>
 
-        <!-- 3. Profile Selection Cards -->
-        <StackPanel Grid.Row="2" Margin="0,0,0,12">
+        <!-- 2. Cooling Profiles Section -->
+        <StackPanel Grid.Row="2" Margin="0,0,0,8">
             <TextBlock Text="Cooling Profiles" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,8" />
 
             <UniformGrid Columns="3">
                 <!-- Quiet Profile -->
-                <Button Style="{StaticResource ProfileCardButton}" Command="{Binding SelectQuietCommand}" Margin="0,0,6,0" Height="96" Padding="14">
-                    <StackPanel Width="220">
-                        <TextBlock Text="Quiet / Silent" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" />
-                        <TextBlock Text="13W–20W PL1 / 28W PL2 efficiency mode with passive cooling priority." FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                <Button Style="{StaticResource ProfileCardButton}"
+                        Command="{Binding SelectQuietCommand}"
+                        Tag="{Binding IsQuietActive}"
+                        Margin="0,0,6,0" MinHeight="88" Padding="12">
+                    <StackPanel HorizontalAlignment="Stretch">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <Path Data="{StaticResource LeafGeometry}" Fill="{StaticResource AccentGreen}" Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="Quiet / Silent" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Text="13W PL1 / 28W PL2 efficiency mode with passive cooling priority." FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" />
                     </StackPanel>
                 </Button>
 
                 <!-- Balanced Profile -->
-                <Button Style="{StaticResource ProfileCardButton}" Command="{Binding SelectBalancedCommand}" Margin="3,0,3,0" Height="96" Padding="14">
-                    <StackPanel Width="220">
-                        <TextBlock Text="Balanced" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" />
-                        <TextBlock Text="Surface factory default thermal curve and automatic SAM fan control." FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                <Button Style="{StaticResource ProfileCardButton}"
+                        Command="{Binding SelectBalancedCommand}"
+                        Tag="{Binding IsBalancedActive}"
+                        Margin="3,0,3,0" MinHeight="88" Padding="12">
+                    <StackPanel HorizontalAlignment="Stretch">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <Path Data="{StaticResource BalancedGeometry}" Fill="{StaticResource AccentBlue}" Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="Balanced" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Text="Surface factory default thermal curve and automatic SAM fan control." FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" />
                     </StackPanel>
                 </Button>
 
                 <!-- Turbo Profile -->
-                <Button Style="{StaticResource ProfileCardButton}" Command="{Binding SelectTurboCommand}" Margin="6,0,0,0" Height="96" Padding="14">
-                    <StackPanel Width="220">
-                        <TextBlock Text="Turbo Cooling (4200 RPM)" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" />
-                        <TextBlock Text="26W PL1 / 35W PL2 performance mode + direct 4200 RPM SAM spin-up." FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                <Button Style="{StaticResource ProfileCardButton}"
+                        Command="{Binding SelectTurboCommand}"
+                        Tag="{Binding IsTurboActive}"
+                        Margin="6,0,0,0" MinHeight="88" Padding="12">
+                    <StackPanel HorizontalAlignment="Stretch">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <Path Data="{StaticResource TurboGeometry}" Fill="{StaticResource AccentOrange}" Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="Turbo Cooling (4200 RPM)" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Text="30W PL1 / 35W PL2 performance mode + direct 4200 RPM SAM spin-up." FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" />
                     </StackPanel>
                 </Button>
             </UniformGrid>
         </StackPanel>
 
-        <!-- 4. Direct Manual Fan Speed Bar -->
-        <Border Grid.Row="3" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
+        <!-- 3. Direct Manual Fan Speed Bar -->
+        <Border Grid.Row="3" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,8">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="210" />
+                    <ColumnDefinition Width="250" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="100" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <TextBlock Text="Manual Fan Speed Override" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" />
-                    <TextBlock Text="Direct SAM command (0–4800 RPM)" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0" />
+                    <TextBlock Text="Direct SAM command (Auto / 2000–4800 RPM)" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0" />
                 </StackPanel>
 
                 <Slider Grid.Column="1"
@@ -191,18 +240,32 @@
                            Foreground="{StaticResource AccentBlue}"
                            VerticalAlignment="Center"
                            HorizontalAlignment="Right"
-                           Margin="0,0,12,0" />
+                           Margin="0,0,14,0" />
 
+                <!-- Apply RPM Button (Primary) -->
                 <Button Grid.Column="3"
-                        Style="{StaticResource SecondaryButton}"
+                        Style="{StaticResource PrimaryActionButton}"
                         Content="Apply RPM"
                         Command="{Binding ApplyManualRpmCommand}"
-                        VerticalAlignment="Center" />
+                        VerticalAlignment="Center"
+                        Margin="0,0,8,0" />
+
+                <!-- Reset Only Fan Speed Button (Secondary) -->
+                <Button Grid.Column="4"
+                        Style="{StaticResource SecondaryButton}"
+                        Command="{Binding ResetFanOnlyCommand}"
+                        ToolTip="Reset fan speed back to automatic SAM control without changing power limits"
+                        VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource ResetGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <TextBlock Text="Reset Fan Speed" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
             </Grid>
         </Border>
 
-        <!-- 5. Stock Reset Action Bar -->
-        <Border Grid.Row="4" Background="#232328" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
+        <!-- 4. Stock Reset Action Bar -->
+        <Border Grid.Row="4" Background="#222227" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -222,8 +285,8 @@
             </Grid>
         </Border>
 
-        <!-- 6. Surface Thermal Sensors Detail List -->
-        <Border Grid.Row="5" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,0,10">
+        <!-- 5. Surface Thermal Sensors Detail List -->
+        <Border Grid.Row="5" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16,14" Margin="0,0,0,10">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -244,7 +307,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="#1C1C20" BorderBrush="#2C2C34" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="4">
+                                <Border Background="{StaticResource SubCardBackground}" BorderBrush="{StaticResource SubCardBorder}" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="4">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -264,15 +327,40 @@
             </Grid>
         </Border>
 
-        <!-- 7. Footer -->
-        <Grid Grid.Row="6">
+        <!-- 6. Footer with Status and Clean Developer Links -->
+        <Grid Grid.Row="6" Margin="0,4,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Text="Surface Pro 9 • Windows 11" FontSize="11" Foreground="{StaticResource TextTertiary}" VerticalAlignment="Center" />
+            <!-- Status Message -->
+            <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+            <!-- Right: Links and Device Info -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- GitHub Link -->
+                <Button Style="{StaticResource SubtleLinkButton}" Command="{Binding OpenGitHubCommand}" ToolTip="https://github.com/mkroshana" Margin="0,0,12,0">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource GitHubGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <TextBlock Text="GitHub" FontSize="11" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Email Link -->
+                <Button Style="{StaticResource SubtleLinkButton}" Command="{Binding OpenEmailCommand}" ToolTip="mailto:mkroshana@gmail.com" Margin="0,0,16,0">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource MailGeometry}" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <TextBlock Text="mkroshana@gmail.com" FontSize="11" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Separator -->
+                <Rectangle Width="1" Height="12" Fill="{StaticResource CardBorder}" Margin="0,0,16,0" VerticalAlignment="Center" />
+
+                <!-- Machine Info -->
+                <TextBlock Text="{Binding ProcessorName}" FontSize="11" Foreground="{StaticResource TextTertiary}" VerticalAlignment="Center" />
+            </StackPanel>
         </Grid>
     </Grid>
 </Window>

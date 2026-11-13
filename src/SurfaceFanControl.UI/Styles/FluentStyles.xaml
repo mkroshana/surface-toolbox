@@ -1,42 +1,162 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Color Palette -->
-    <SolidColorBrush x:Key="AppBackground" Color="#18181B" />
-    <SolidColorBrush x:Key="CardBackground" Color="#222226" />
-    <SolidColorBrush x:Key="CardBackgroundHover" Color="#2A2A30" />
-    <SolidColorBrush x:Key="CardBorder" Color="#323238" />
+    <!-- Fluent Windows 11 Dark Color Palette -->
+    <SolidColorBrush x:Key="AppBackground" Color="#1E1E22" />
+    <SolidColorBrush x:Key="CardBackground" Color="#26262B" />
+    <SolidColorBrush x:Key="CardBackgroundHover" Color="#2F2F36" />
+    <SolidColorBrush x:Key="SubCardBackground" Color="#1C1C20" />
+    <SolidColorBrush x:Key="SubCardBorder" Color="#2E2E35" />
+    
+    <SolidColorBrush x:Key="CardBorder" Color="#383842" />
     <SolidColorBrush x:Key="CardBorderActive" Color="#0078D4" />
+    <SolidColorBrush x:Key="CardBorderSubtle" Color="#2E2E35" />
     
     <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF" />
     <SolidColorBrush x:Key="TextSecondary" Color="#A1A1AA" />
     <SolidColorBrush x:Key="TextTertiary" Color="#71717A" />
     
-    <SolidColorBrush x:Key="AccentBlue" Color="#0078D4" />
-    <SolidColorBrush x:Key="AccentGreen" Color="#10B981" />
-    <SolidColorBrush x:Key="AccentOrange" Color="#F59E0B" />
-    <SolidColorBrush x:Key="AccentRed" Color="#EF4444" />
+    <SolidColorBrush x:Key="AccentBlue" Color="#38BDF8" />
+    <SolidColorBrush x:Key="AccentBluePrimary" Color="#0078D4" />
+    <SolidColorBrush x:Key="AccentBlueHover" Color="#1084D9" />
+    <SolidColorBrush x:Key="AccentGreen" Color="#34D399" />
+    <SolidColorBrush x:Key="AccentOrange" Color="#FBBF24" />
+    <SolidColorBrush x:Key="AccentRed" Color="#F87171" />
 
-    <!-- Card Button Style -->
+    <!-- Vector Icon Geometries (Segoe Fluent / MDL2 aligned) -->
+    <!-- Fan Impeller -->
+    <Geometry x:Key="FanGeometry">
+        M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 2c1.8 0 3.4.6 4.8 1.6-1.5.6-3.8 1.8-5 3.4V4.1c.1 0 .1-.1.2-.1zm-2 2.1v3.9c-1.2-1.6-3.5-2.8-5-3.4C6.4 5.6 8.1 5 10 5c.7 0 1.3.1 2 .2-.7.2-1.4.5-2 .9zm-3.9 5.9c.6 1.5 1.8 3.8 3.4 5H5.6c-.4-.9-.6-2-.6-3 0-.7.1-1.3.3-2h4.2zm6.9 7c-1.8 0-3.4-.6-4.8-1.6 1.5-.6 3.8-1.8 5-3.4v4.9c-.1 0-.1.1-.2.1zm2-2.1v-3.9c1.2 1.6 3.5 2.8 5 3.4-1.4 1-3.1 1.6-5 1.6-.7 0-1.3-.1-2-.2.7-.2 1.4-.5 2-.9zm3.9-5.9c-.6-1.5-1.8-3.8-3.4-5h3.9c.4.9.6 2 .6 3 0 .7-.1 1.3-.3 2h-4.2zM12 10.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3z
+    </Geometry>
+
+    <!-- Thermometer -->
+    <Geometry x:Key="ThermometerGeometry">
+        M12 2a3 3 0 00-3 3v7.3a5 5 0 106 0V5a3 3 0 00-3-3zm0 2a1 1 0 011 1v2h-2V5a1 1 0 011-1zm-1 5h2v3.6a1 1 0 00.4.8 3 3 0 11-2.8 0 1 1 0 00.4-.8V9z
+    </Geometry>
+
+    <!-- Tachometer / Speedometer -->
+    <Geometry x:Key="TachometerGeometry">
+        M12 4a9 9 0 00-9 9c0 2.4.9 4.6 2.5 6.2l1.4-1.4A7 7 0 1119.1 17.8l1.4 1.4A9 9 0 0012 4zm-1 5v4.2l2.6 1.5.8-1.3-2.4-1.4V9h-1z
+    </Geometry>
+
+    <!-- Power / Bolt -->
+    <Geometry x:Key="BoltGeometry">
+        M11 2L4 13h6l-1 9 8-12h-6l2-8z
+    </Geometry>
+
+    <!-- CPU Chip -->
+    <Geometry x:Key="CpuGeometry">
+        M5 3a2 2 0 00-2 2v2H1v2h2v2H1v2h2v2H1v2h2v2a2 2 0 002 2h2v2h2v-2h2v2h2v-2h2v2h2v-2h2a2 2 0 002-2v-2h2v-2h-2v-2h2v-2h-2v-2h2V7h-2V5a2 2 0 00-2-2h-2V1h-2v2h-2V1h-2v2h-2V1H7v2H5zm0 2h14v14H5V5zm3 3v8h8V8H8zm2 2h4v4h-4v-4z
+    </Geometry>
+
+    <!-- Reset / Return Arrow -->
+    <Geometry x:Key="ResetGeometry">
+        M12 4V1L8 5l4 4V6a6 6 0 11-6 6H4a8 8 0 108-8z
+    </Geometry>
+
+    <!-- GitHub Silhouette -->
+    <Geometry x:Key="GitHubGeometry">
+        M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z
+    </Geometry>
+
+    <!-- Mail Envelope -->
+    <Geometry x:Key="MailGeometry">
+        M3 4a2 2 0 00-2 2v12a2 2 0 002 2h18a2 2 0 002-2V6a2 2 0 00-2-2H3zm0 2h18v1.2l-9 5.6-9-5.6V6zm0 3.4l8.5 5.3a1 1 0 001 0L21 9.4V18H3V9.4z
+    </Geometry>
+
+    <!-- Leaf / Whisper (Quiet) -->
+    <Geometry x:Key="LeafGeometry">
+        M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.3c.48.17.98.3 1.34.3C19 20 22 3 22 3c-1 2-8 2.25-13 3.25S2 11.5 2 13.5c0 2 2.5 3.5 4 3.5 1.8 0 4.2-1.5 6-3 1.8-1.5 3-3.5 5-6z
+    </Geometry>
+
+    <!-- Balanced Meter -->
+    <Geometry x:Key="BalancedGeometry">
+        M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z
+    </Geometry>
+
+    <!-- Turbo Lightning -->
+    <Geometry x:Key="TurboGeometry">
+        M7 2v11h3v9l7-12h-4l4-8z
+    </Geometry>
+
+    <!-- Profile Card Button Style -->
     <Style x:Key="ProfileCardButton" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource CardBackground}" />
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
         <Setter Property="BorderBrush" Value="{StaticResource CardBorder}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border Background="{TemplateBinding Background}"
+                    <Border x:Name="CardBorderElement"
+                            Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="10"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="CardBorderElement" Property="Background" Value="{StaticResource CardBackgroundHover}" />
+                            <Setter TargetName="CardBorderElement" Property="BorderBrush" Value="#4B4B58" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="CardBorderElement" Property="Background" Value="#222227" />
+                        </Trigger>
+                        <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+                            <Setter TargetName="CardBorderElement" Property="BorderBrush" Value="{StaticResource CardBorderActive}" />
+                            <Setter TargetName="CardBorderElement" Property="BorderThickness" Value="1.5" />
+                            <Setter TargetName="CardBorderElement" Property="Background" Value="#2A2A32" />
+                        </DataTrigger>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True" />
+                                <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True" />
+                            </MultiDataTrigger.Conditions>
+                            <Setter TargetName="CardBorderElement" Property="Background" Value="#32323D" />
+                            <Setter TargetName="CardBorderElement" Property="BorderBrush" Value="{StaticResource AccentBlueHover}" />
+                        </MultiDataTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Primary Action Button (Fluent Accent Blue) -->
+    <Style x:Key="PrimaryActionButton" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource AccentBluePrimary}" />
+        <Setter Property="Foreground" Value="#FFFFFF" />
+        <Setter Property="BorderBrush" Value="#0284C7" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Padding" Value="16,7" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="BtnBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="6"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="{StaticResource CardBackgroundHover}" />
+                            <Setter TargetName="BtnBorder" Property="Background" Value="{StaticResource AccentBlueHover}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="BtnBorder" Property="Background" Value="#006CBE" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="BtnBorder" Property="Opacity" Value="0.5" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -46,16 +166,18 @@
 
     <!-- Secondary Action Button -->
     <Style x:Key="SecondaryButton" TargetType="Button">
-        <Setter Property="Background" Value="#2D2D33" />
+        <Setter Property="Background" Value="#2E2E35" />
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
         <Setter Property="BorderBrush" Value="{StaticResource CardBorder}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Padding" Value="14,7" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border Background="{TemplateBinding Background}"
+                    <Border x:Name="BtnBorder"
+                            Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="6"
@@ -64,9 +186,99 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="#383840" />
+                            <Setter TargetName="BtnBorder" Property="Background" Value="#383842" />
+                            <Setter TargetName="BtnBorder" Property="BorderBrush" Value="#4C4C58" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="BtnBorder" Property="Background" Value="#26262C" />
                         </Trigger>
                     </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Subtle Clickable Link Button (for footer/about links) -->
+    <Style x:Key="SubtleLinkButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Padding" Value="6,3" />
+        <Setter Property="Foreground" Value="{StaticResource TextSecondary}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="LinkBorder"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="4"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="LinkBorder" Property="Background" Value="#1AFFFFFF" />
+                            <Setter Property="Foreground" Value="{StaticResource AccentBlue}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="LinkBorder" Property="Background" Value="#26FFFFFF" />
+                            <Setter Property="Foreground" Value="#60A5FA" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Windows 11 Modern Dark ScrollBar Style -->
+    <Style x:Key="FluentScrollThumb" TargetType="{x:Type Thumb}">
+        <Setter Property="OverridesDefaultStyle" Value="true" />
+        <Setter Property="IsTabStop" Value="false" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Thumb}">
+                    <Border x:Name="ThumbBorder"
+                            CornerRadius="3"
+                            Background="#454550"
+                            Margin="2,0" />
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ThumbBorder" Property="Background" Value="#626272" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="ThumbBorder" Property="Background" Value="#7E7E90" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="{x:Type ScrollBar}">
+        <Setter Property="Stylus.IsPressAndHoldEnabled" Value="false" />
+        <Setter Property="Stylus.IsFlicksEnabled" Value="false" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Width" Value="8" />
+        <Setter Property="MinWidth" Value="8" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ScrollBar}">
+                    <Grid x:Name="Bg" SnapsToDevicePixels="true">
+                        <Track x:Name="PART_Track"
+                               IsDirectionReversed="true"
+                               IsEnabled="{TemplateBinding IsMouseOver}">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="{x:Static ScrollBar.LineUpCommand}" Opacity="0" Focusable="false" />
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource FluentScrollThumb}" />
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="{x:Static ScrollBar.LineDownCommand}" Opacity="0" Focusable="false" />
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

@@ -1,5 +1,6 @@
 using System;
 using System.Management;
+using System.Runtime.InteropServices;
 
 namespace SurfaceFanControl.Core.Hardware
 {
@@ -21,11 +22,15 @@ namespace SurfaceFanControl.Core.Hardware
             try
             {
                 using var searcher = new ManagementObjectSearcher("SELECT Manufacturer, Model FROM Win32_ComputerSystem");
-                foreach (ManagementObject obj in searcher.Get())
+                using var results = searcher.Get();
+                foreach (ManagementObject obj in results)
                 {
-                    info.Manufacturer = obj["Manufacturer"]?.ToString() ?? string.Empty;
-                    info.Model = obj["Model"]?.ToString() ?? string.Empty;
-                    break;
+                    using (obj)
+                    {
+                        info.Manufacturer = obj["Manufacturer"]?.ToString() ?? string.Empty;
+                        info.Model = obj["Model"]?.ToString() ?? string.Empty;
+                        break;
+                    }
                 }
             }
             catch { }
@@ -33,10 +38,14 @@ namespace SurfaceFanControl.Core.Hardware
             try
             {
                 using var cpuSearcher = new ManagementObjectSearcher("SELECT Name FROM Win32_Processor");
-                foreach (ManagementObject obj in cpuSearcher.Get())
+                using var cpuResults = cpuSearcher.Get();
+                foreach (ManagementObject obj in cpuResults)
                 {
-                    info.ProcessorName = obj["Name"]?.ToString()?.Trim() ?? string.Empty;
-                    break;
+                    using (obj)
+                    {
+                        info.ProcessorName = obj["Name"]?.ToString()?.Trim() ?? string.Empty;
+                        break;
+                    }
                 }
             }
             catch { }
@@ -46,6 +55,18 @@ namespace SurfaceFanControl.Core.Hardware
 
             // Check if Surface Overlay power setting can be read
             Guid scheme = new Guid("381b4222-f694-41f0-9685-ff5bb260df2e");
+            if (NativePower.PowerGetActiveScheme(IntPtr.Zero, out IntPtr ptr) == NativePower.ERROR_SUCCESS && ptr != IntPtr.Zero)
+            {
+                try
+                {
+                    scheme = Marshal.PtrToStructure<Guid>(ptr);
+                }
+                finally
+                {
+                    NativePower.LocalFree(ptr);
+                }
+            }
+
             Guid overlaySubgroup = NativePower.GUID_SURFACE_OVERLAY_SUBGROUP;
             Guid overlaySetting = NativePower.GUID_SURFACE_OVERLAY_SETTING;
 

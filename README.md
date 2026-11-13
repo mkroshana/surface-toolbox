@@ -68,8 +68,8 @@ Unlike standard PCs with SuperI/O PWM registers, modern Intel Surface devices (s
 | **Fan Interface** | `b620798f-6fb0-42ef-b9b3-d2370402e089` | `0x6F` (`111`) | `O_FAN1_MAX_SPL` (Acoustic limit) |
 | **Fan Interface** | `b620798f-6fb0-42ef-b9b3-d2370402e089` | `0xC9` (`201`) | `O_FAN1_PROFILE` (`2` = Balanced/Quiet, `3` = Better Perf, `4` = Best Perf) |
 | **Fan Interface** | `b620798f-6fb0-42ef-b9b3-d2370402e089` | `0x12D` (`301`) | `O_FAN_CS_REQUEST` (`1` = Normal) |
-| **Power Limits** | `fb805e77-616e-4ea8-bac1-6859a6c2d4b1` | `0x01`, `0x02` | CPU `PL1` (`0x01`) and `PL2` (`0x02`) in milliwatts (`mW`) |
-| **Processor Power** | `049e36f2-906d-47f2-aca4-610552bfb1fa` | `0x01`, `0x02` | Live CPU Package Power (`0x01`) in milliwatts (`mW`) |
+| **Power Limits** | `fb805e77-616e-4ea8-bac1-6859a6c2d4b1` | `0x01`, `0x02` | CPU `PL2` (`0x01`) and `PL1` (`0x02`) in milliwatts (`mW`) |
+| **Processor Power** | `049e36f2-906d-47f2-aca4-610552bfb1fa` | `0x01` | Live CPU Package Power (`0x01`) in milliwatts (`mW`, on-demand helper via `TryReadPackagePower`) |
 | **System Slider** | `87008365-ea3a-461c-b83d-6ac6e8db2f8a` | `0x01` | `I_SLIDER` state |
 
 ---
@@ -80,10 +80,10 @@ Calling `PowerSetActiveOverlayScheme(ref Guid overlayGuid)` immediately transiti
 
 | Mode | Overlay Scheme GUID | SMF `O_FAN1_PROFILE` | SMF `PL1 / PL2` |
 | :--- | :--- | :---: | :---: |
-| **Quiet / Silent** | `961cc777-2547-4f9d-8174-7d86181b8a7a` (*Best Power Efficiency*) | `2` | `13 W–20 W / 28 W` |
-| **Balanced (Auto)** | `00000000-0000-0000-0000-000000000000` (*Recommended*) | `2` | `21 W–24 W / 28 W` |
-| **Manual Override** | `3af9b8d9-7c97-431d-ad78-34a8bfea439f` (*Better Performance*) | `3` | `24 W / 28 W` |
-| **Turbo Cooling** | `ded574b5-45a0-4f42-8737-46345c09c238` (*Best Performance*) | `4` (+ `4200 RPM` SAM override) | `26 W / 35 W` |
+| **Quiet / Silent** | `961cc777-2547-4f9d-8174-7d86181b8a7a` (*Best Power Efficiency* + `99% max processor state`) | `2` | `13 W / 28 W` |
+| **Balanced (Auto)** | `00000000-0000-0000-0000-000000000000` (*Recommended*) | `2` | `13 W–21 W / 28 W` |
+| **Manual Override** | `3af9b8d9-7c97-431d-ad78-34a8bfea439f` (*Better Performance*) | `3` | `28 W / 30 W` |
+| **Turbo Cooling** | `ded574b5-45a0-4f42-8737-46345c09c238` (*Best Performance*) | `4` (+ `4200 RPM` SAM override) | `30 W / 35 W` |
 
 ---
 
@@ -116,5 +116,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Run
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\test_verification.ps1
 
 # Restore OEM stock power overlay and reset SAM fan to 0 RPM (Auto)
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\restore_stock_settings.ps1
+# Note: Administrator privileges are required to reset a direct SAM fan speed override (MSHW0084)
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\restore_stock_settings.ps1
+# (or: .\build.ps1 -RestoreStock)
 ```
