@@ -64,6 +64,9 @@
             <TabItem Style="{StaticResource SidebarTabItem}" Header="Battery" Tag="{StaticResource BatteryGeometry}">
                 <views:BatteryPage DataContext="{Binding Battery}" />
             </TabItem>
+            <TabItem Style="{StaticResource SidebarTabItem}" Header="Display" Tag="{StaticResource DisplayGeometry}">
+                <views:DisplayPage DataContext="{Binding Display}" />
+            </TabItem>
         </TabControl>
 
         <!-- 2. Footer with Status and Clean Developer Links -->

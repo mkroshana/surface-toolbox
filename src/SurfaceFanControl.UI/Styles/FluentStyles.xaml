@@ -84,6 +84,11 @@
         M4 7h13a2 2 0 012 2v1h1a1 1 0 011 1v2a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H4a2 2 0 01-2-2V9a2 2 0 012-2zM4 9v6h13V9H4zM5.5 10.5h7v3h-7v-3z
     </Geometry>
 
+    <!-- Display: a monitor outline on a stand -->
+    <Geometry x:Key="DisplayGeometry">
+        M3 4h18a1 1 0 011 1v11a1 1 0 01-1 1h-7v2h3v2H7v-2h3v-2H3a1 1 0 01-1-1V5a1 1 0 011-1zM4 6v9h16V6H4z
+    </Geometry>
+
     <!-- Profile Card Button Style -->
     <Style x:Key="ProfileCardButton" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource CardBackground}" />

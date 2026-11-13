@@ -302,6 +302,9 @@ namespace SurfaceFanControl.UI.ViewModels
         /// <summary>Backs the Battery page; it only polls while that page is on screen.</summary>
         public BatteryViewModel Battery { get; } = new BatteryViewModel();
 
+        /// <summary>Backs the Display page; it only polls while that page is on screen.</summary>
+        public DisplayViewModel Display { get; } = new DisplayViewModel();
+
         public ICommand SelectQuietCommand { get; }
         public ICommand SelectBalancedCommand { get; }
         public ICommand SelectBetterPerformanceCommand { get; }
@@ -546,6 +549,7 @@ namespace SurfaceFanControl.UI.ViewModels
             _thermalMonitor.SnapshotUpdated -= OnSnapshotUpdated;
             _profileManager.ActiveProfileChanged -= OnProfileChanged;
             Battery.Dispose();
+            Display.Dispose();
             _thermalMonitor.Dispose();
             _powerManager.Dispose();
         }
