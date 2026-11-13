@@ -163,7 +163,7 @@
         <StackPanel Grid.Row="2" Margin="0,0,0,8">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                 <TextBlock Text="Power Mode" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" />
-                <TextBlock Text=" • Sets the Windows power mode only. Fan speed is set separately below." FontSize="12" Foreground="{StaticResource TextTertiary}" />
+                <TextBlock Text=" • Power only. Fan speed is set separately below." FontSize="12" Foreground="{StaticResource TextTertiary}" />
             </StackPanel>
 
             <UniformGrid Columns="4">
@@ -178,7 +178,7 @@
                             <Path Data="{StaticResource LeafGeometry}" Fill="{StaticResource AccentGreen}" Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0" />
                             <TextBlock Text="Quiet" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
                         </StackPanel>
-                        <TextBlock Text="Best Power Efficiency with the processor capped at 99% (turbo boost off)." FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" />
+                        <TextBlock Text="Not in Windows Settings: Best Power Efficiency plus a 99% processor cap (turbo boost off)." FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" />
                     </StackPanel>
                 </Button>
 
