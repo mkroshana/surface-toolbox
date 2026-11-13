@@ -29,7 +29,7 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
 
 $rootDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $bin = Join-Path $rootDir "src\SurfaceToolbox.UI\bin\Release\net8.0-windows"
-foreach ($dll in "SurfaceToolbox.Core.dll", "SurfaceToolbox.UI.dll") {
+foreach ($dll in "SurfaceToolbox.Core.dll", "SurfaceToolbox.dll") {
     $path = Join-Path $bin $dll
     if (-not (Test-Path $path)) { Write-Host "[ERROR] Not built: $path. Run build.ps1 first." -ForegroundColor Red; exit 1 }
     [System.Reflection.Assembly]::LoadFrom($path) | Out-Null
@@ -142,19 +142,19 @@ Check "on-battery mode" (ModeOf $SRC::Battery) (ModeName $reg.ActiveOverlayDcPow
 # 5. Sign-in task definition (not registered) --------------------------------------------------------
 Section "Sign-in task: the definition the app would register"
 $Autostart = [SurfaceToolbox.UI.Services.AutostartService]
-$definition = $Autostart::BuildDefinition("C:\Some Folder\SurfaceToolbox.UI.exe")
+$definition = $Autostart::BuildDefinition("C:\Some Folder\SurfaceToolbox.exe")
 $ns = "http://schemas.microsoft.com/windows/2004/02/mit/task"
 function TaskValue([string[]]$path) { $e = $definition.Root; foreach ($p in $path) { $e = $e.Element([System.Xml.Linq.XName]::Get($p, $ns)) }; $e.Value }
 Check "starts on battery" (TaskValue "Settings", "DisallowStartIfOnBatteries") "false"
 Check "keeps running on battery" (TaskValue "Settings", "StopIfGoingOnBatteries") "false"
 Check "no time limit" (TaskValue "Settings", "ExecutionTimeLimit") "PT0S"
 Check "highest privileges" (TaskValue "Principals", "Principal", "RunLevel") "HighestAvailable"
-Check "program is quoted" (TaskValue "Actions", "Exec", "Command") '"C:\Some Folder\SurfaceToolbox.UI.exe"'
+Check "program is quoted" (TaskValue "Actions", "Exec", "Command") '"C:\Some Folder\SurfaceToolbox.exe"'
 Check "starts in the tray" (TaskValue "Actions", "Exec", "Arguments") "--tray"
 
 # 6. Checks that change settings and put them back ---------------------------------------------------
 if ($IncludeWrites) {
-    $appRunning = [bool](Get-Process -Name "SurfaceToolbox.UI" -ErrorAction SilentlyContinue)
+    $appRunning = [bool](Get-Process -Name "SurfaceToolbox" -ErrorAction SilentlyContinue)
     $taskName = $Autostart::TaskName
     $taskExists = [bool](Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)
 
@@ -194,7 +194,7 @@ if ($IncludeWrites) {
     if ($taskExists) {
         Write-Host "  [SKIP] '$taskName' already exists on this device; leaving it alone." -ForegroundColor Yellow
     } else {
-        $service = $Autostart::new(); $exe = Join-Path $bin "SurfaceToolbox.UI.exe"; $err = ""
+        $service = $Autostart::new(); $exe = Join-Path $bin "SurfaceToolbox.exe"; $err = ""
         try {
             Check "Enable" $service.Enable($exe, [ref]$err) $true
             $task = Get-ScheduledTask -TaskName $taskName

@@ -2,6 +2,9 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <!-- The program is SurfaceToolbox.exe. The project and its namespaces keep the .UI suffix. -->
+    <AssemblyName>SurfaceToolbox</AssemblyName>
+    <RootNamespace>SurfaceToolbox.UI</RootNamespace>
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>

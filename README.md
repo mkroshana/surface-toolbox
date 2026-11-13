@@ -131,12 +131,15 @@ Calling `PowerSetActiveOverlayScheme(ref Guid overlayGuid)` immediately transiti
 
 ### Compiled Executable Location
 ```text
-c:\GitHub\Surface-Toolbox\src\SurfaceToolbox.UI\bin\Release\net8.0-windows\SurfaceToolbox.UI.exe
+c:\GitHub\Surface-Toolbox\src\SurfaceToolbox.UI\bin\Release\net8.0-windows\SurfaceToolbox.exe
 ```
 
 ### Commands
 ```powershell
-# Build Release binaries
+# Get the latest changes (run in the repository folder), then build as below
+git pull
+
+# Build Release binaries (closes a running copy of the app first; run from an elevated prompt for that to work)
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 
 # Build and launch the WPF application (prompts UAC for direct SAM access)

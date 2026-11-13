@@ -8,7 +8,7 @@
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
         Title="Surface Toolbox"
-        Icon="pack://application:,,,/SurfaceToolbox.UI;component/Assets/app.ico"
+        Icon="pack://application:,,,/Assets/app.ico"
         Height="820" Width="1100"
         MinHeight="780" MinWidth="1060"
         WindowStartupLocation="CenterScreen"

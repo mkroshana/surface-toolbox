@@ -21,15 +21,15 @@ $procSub  = "54533251-82be-4824-96c1-47b60b740d00"
 $procMax  = "bc5038f7-23e0-4960-96da-33abaf5935ec"
 $procMin  = "893dee8e-2bef-41e0-89c6-b55d0929964c"
 
-$runningApp = Get-Process -Name "SurfaceToolbox.UI" -ErrorAction SilentlyContinue
+$runningApp = Get-Process -Name "SurfaceToolbox" -ErrorAction SilentlyContinue
 if ($null -ne $runningApp) {
-    Write-Host "[*] Stopping running SurfaceToolbox.UI instance to prevent keep-alive override..." -ForegroundColor Yellow
+    Write-Host "[*] Stopping running SurfaceToolbox instance to prevent keep-alive override..." -ForegroundColor Yellow
     try {
-        Stop-Process -Name "SurfaceToolbox.UI" -Force -ErrorAction Stop
+        Stop-Process -Name "SurfaceToolbox" -Force -ErrorAction Stop
         Start-Sleep -Milliseconds 300
-        Write-Host "[+] Stopped running SurfaceToolbox.UI process." -ForegroundColor Green
+        Write-Host "[+] Stopped running SurfaceToolbox process." -ForegroundColor Green
     } catch {
-        Write-Host "[WARN] Could not stop running SurfaceToolbox.UI process (it may be running as Administrator). Run this script as Administrator to stop it." -ForegroundColor Yellow
+        Write-Host "[WARN] Could not stop running SurfaceToolbox process (it may be running as Administrator). Run this script as Administrator to stop it." -ForegroundColor Yellow
     }
 }
 

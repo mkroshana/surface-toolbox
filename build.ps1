@@ -31,9 +31,9 @@ function Resolve-DotNet {
 }
 
 if ($RestoreStock) {
-    if (Get-Process -Name "SurfaceToolbox.UI" -ErrorAction SilentlyContinue) {
-        Write-Host "[*] Stopping running SurfaceToolbox.UI instance..." -ForegroundColor Yellow
-        Stop-Process -Name "SurfaceToolbox.UI" -Force -ErrorAction SilentlyContinue
+    if (Get-Process -Name "SurfaceToolbox" -ErrorAction SilentlyContinue) {
+        Write-Host "[*] Stopping running SurfaceToolbox instance..." -ForegroundColor Yellow
+        Stop-Process -Name "SurfaceToolbox" -Force -ErrorAction SilentlyContinue
         Start-Sleep -Milliseconds 300
     }
     Write-Host "[*] Executing stock settings restore script..." -ForegroundColor Cyan
@@ -45,9 +45,9 @@ Write-Host "==========================================================" -Foregro
 Write-Host "         Surface Toolbox - Build Script               " -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-if (Get-Process -Name "SurfaceToolbox.UI" -ErrorAction SilentlyContinue) {
-    Write-Host "[*] Stopping running SurfaceToolbox.UI instance..." -ForegroundColor Yellow
-    Stop-Process -Name "SurfaceToolbox.UI" -Force -ErrorAction SilentlyContinue
+if (Get-Process -Name "SurfaceToolbox" -ErrorAction SilentlyContinue) {
+    Write-Host "[*] Stopping running SurfaceToolbox instance..." -ForegroundColor Yellow
+    Stop-Process -Name "SurfaceToolbox" -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 300
 }
 
@@ -69,7 +69,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "[OK] Build completed successfully!" -ForegroundColor Green
 
 if ($Run) {
-    $exePath = Join-Path $scriptDir "src\SurfaceToolbox.UI\bin\$Configuration\net8.0-windows\SurfaceToolbox.UI.exe"
+    $exePath = Join-Path $scriptDir "src\SurfaceToolbox.UI\bin\$Configuration\net8.0-windows\SurfaceToolbox.exe"
     if (Test-Path $exePath) {
         Write-Host "[*] Launching Surface Toolbox: $exePath..." -ForegroundColor Green
         Start-Process -FilePath $exePath
