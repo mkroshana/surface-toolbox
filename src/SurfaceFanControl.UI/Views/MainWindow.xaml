@@ -70,6 +70,9 @@
             <TabItem Style="{StaticResource SidebarTabItem}" Header="History" Tag="{StaticResource HistoryGeometry}">
                 <views:HistoryPage DataContext="{Binding History}" />
             </TabItem>
+            <TabItem Style="{StaticResource SidebarTabItem}" Header="Device" Tag="{StaticResource DeviceGeometry}">
+                <views:DevicePage DataContext="{Binding Device}" />
+            </TabItem>
         </TabControl>
 
         <!-- 2. Footer with Status and Clean Developer Links -->

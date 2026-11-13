@@ -308,6 +308,9 @@ namespace SurfaceFanControl.UI.ViewModels
         /// <summary>Backs the History page; every monitor reading is recorded into it.</summary>
         public HistoryViewModel History { get; } = new HistoryViewModel();
 
+        /// <summary>Backs the Device page; the report is read when that page is first opened.</summary>
+        public DeviceViewModel Device { get; } = new DeviceViewModel();
+
         public ICommand SelectQuietCommand { get; }
         public ICommand SelectBalancedCommand { get; }
         public ICommand SelectBetterPerformanceCommand { get; }
