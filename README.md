@@ -136,11 +136,11 @@ c:\GitHub\Surface-Toolbox\src\SurfaceToolbox.UI\bin\Release\net8.0-windows\Surfa
 
 ### Commands
 ```powershell
-# Get the latest changes (run in the repository folder), then build as below
-git pull
-
 # Build Release binaries (closes a running copy of the app first; run from an elevated prompt for that to work)
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
+
+# Get the latest changes, then build (runs git pull first; if the pull fails nothing is built and the app is left running)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Pull
 
 # Build and launch the WPF application (prompts UAC for direct SAM access)
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Run
