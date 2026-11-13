@@ -67,17 +67,20 @@ namespace SurfaceFanControl.UI.Tray
             menu.Items.Add(header);
             menu.Items.Add(new ToolStripSeparator());
 
-            var quietItem = new ToolStripMenuItem("Quiet / Silent", null, (s, e) => _viewModel.SetProfile(CoolingProfileType.Quiet));
-            var balancedItem = new ToolStripMenuItem("Balanced (Auto)", null, (s, e) => _viewModel.SetProfile(CoolingProfileType.Balanced));
-            var turboItem = new ToolStripMenuItem("Turbo Cooling (4200 RPM)", null, (s, e) => _viewModel.SetProfile(CoolingProfileType.Turbo));
+            // Power modes only; none of these changes a fan speed the user has set.
+            var quietItem = new ToolStripMenuItem("Power Mode: Quiet", null, (s, e) => _viewModel.SetProfile(CoolingProfileType.Quiet));
+            var balancedItem = new ToolStripMenuItem("Power Mode: Balanced", null, (s, e) => _viewModel.SetProfile(CoolingProfileType.Balanced));
+            var betterItem = new ToolStripMenuItem("Power Mode: Better Performance", null, (s, e) => _viewModel.SetProfile(CoolingProfileType.BetterPerformance));
+            var bestItem = new ToolStripMenuItem("Power Mode: Best Performance", null, (s, e) => _viewModel.SetProfile(CoolingProfileType.BestPerformance));
 
             menu.Items.Add(quietItem);
             menu.Items.Add(balancedItem);
-            menu.Items.Add(turboItem);
+            menu.Items.Add(betterItem);
+            menu.Items.Add(bestItem);
 
             menu.Items.Add(new ToolStripSeparator());
 
-            var resetFanItem = new ToolStripMenuItem("Reset Fan Speed Only (Auto)", null, (s, e) => _viewModel.ResetFanOnly());
+            var resetFanItem = new ToolStripMenuItem("Reset Fan Speed (Auto)", null, (s, e) => _viewModel.ResetFanOnly());
             var stockItem = new ToolStripMenuItem("Reset to Stock Defaults", null, (s, e) => _viewModel.RestoreStock());
             menu.Items.Add(resetFanItem);
             menu.Items.Add(stockItem);

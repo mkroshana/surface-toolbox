@@ -223,47 +223,26 @@ namespace SurfaceFanControl.Core.Hardware
             LastOverlayFailed = overlayResult != NativePower.ERROR_SUCCESS;
             LastFanCommandFailed = false;
 
-            // 3. Direct SAM hardware fan control (when running elevated)
-            bool samApplied = false;
+            // 3. Keep the SAM's fan profile in step with the power mode, as SMF itself does.
+            //    The fan speed target is a separate setting and is deliberately left alone here.
+            bool profileSet = false;
             lock (_fanLock)
             {
                 if (_disposed)
                     return false;
 
+                _activeSamFanProfile = profile.SamFanProfile;
                 if (_samClient.IsDirectSamAvailable)
                 {
-                    bool profileSet = _samClient.TrySetFanProfile(profile.SamFanProfile);
-                    bool rpmSet = _samClient.TrySetFanRpm(profile.TargetFanRpm);
-                    LastFanCommandFailed = !rpmSet;
-                    samApplied = profileSet || rpmSet;
-                    if (samApplied)
+                    profileSet = _samClient.TrySetFanProfile(profile.SamFanProfile);
+                    if (profileSet)
                     {
                         _samModified = true;
                     }
-
-                    if (rpmSet && profile.TargetFanRpm > 0)
-                    {
-                        Interlocked.Exchange(ref _targetSetTickMs, Environment.TickCount64);
-                        _activeTargetRpm = profile.TargetFanRpm;
-                        _activeSamFanProfile = profile.SamFanProfile;
-                        _keepAliveRpmActive = true;
-                    }
-                    else
-                    {
-                        _activeTargetRpm = 0;
-                        _activeSamFanProfile = 2;
-                        _keepAliveRpmActive = false;
-                    }
-                }
-                else
-                {
-                    _activeTargetRpm = 0;
-                    _activeSamFanProfile = 2;
-                    _keepAliveRpmActive = false;
                 }
             }
 
-            if (overlayResult == NativePower.ERROR_SUCCESS || schemeResult == NativePower.ERROR_SUCCESS || samApplied)
+            if (overlayResult == NativePower.ERROR_SUCCESS || schemeResult == NativePower.ERROR_SUCCESS || profileSet)
             {
                 ProfileApplied?.Invoke(profile);
                 return true;
@@ -272,13 +251,56 @@ namespace SurfaceFanControl.Core.Hardware
             return false;
         }
 
+        /// <summary>
+        /// Asks the SAM for a fixed fan speed; 0 returns the fan to automatic control. This is a
+        /// fan-only setting: the power mode and power-plan values are not touched.
+        /// </summary>
         public bool SetManualFanRpm(ushort targetRpm)
         {
             ushort effectiveRpm = targetRpm == 0
                 ? (ushort)0
                 : Math.Clamp(targetRpm, SurfaceSamClient.MinManualFanRpm, SurfaceSamClient.MaxManualFanRpm);
-            var manualProfile = CoolingProfile.CreateManual(effectiveRpm);
-            return ApplyProfile(manualProfile);
+
+            lock (_fanLock)
+            {
+                if (_disposed)
+                    return false;
+
+                LastFanCommandFailed = false;
+                if (!_samClient.IsDirectSamAvailable)
+                    return false;
+
+                bool rpmSet = _samClient.TrySetFanRpm(effectiveRpm);
+                LastFanCommandFailed = !rpmSet;
+                if (!rpmSet)
+                    return false; // Any earlier target and its keep-alive stay as they were.
+
+                _samModified = true;
+                if (effectiveRpm > 0)
+                {
+                    Interlocked.Exchange(ref _targetSetTickMs, Environment.TickCount64);
+                    _activeTargetRpm = effectiveRpm;
+                    _keepAliveRpmActive = true;
+                }
+                else
+                {
+                    _activeTargetRpm = 0;
+                    _keepAliveRpmActive = false;
+                }
+
+                return true;
+            }
+        }
+
+        // The fan profile SMF currently wants for the active power mode (2 = Balanced, 3 = Better,
+        // 4 = Best). Read live so a power mode changed outside the app is respected; falls back
+        // to the profile of the last power mode the app applied.
+        private byte CurrentFanProfile()
+        {
+            if (_samClient.TryReadSmfFanProfile(out int smfProfile) && smfProfile >= 2 && smfProfile <= 4)
+                return (byte)smfProfile;
+
+            return _activeSamFanProfile;
         }
 
         public bool ResetFanSpeedOnly()
@@ -295,7 +317,7 @@ namespace SurfaceFanControl.Core.Hardware
                     return false;
 
                 bool rpmOk = _samClient.TrySetFanRpm(0);
-                _samClient.TrySetFanProfile(2);
+                _samClient.TrySetFanProfile(CurrentFanProfile());
                 if (rpmOk)
                 {
                     _samModified = true;
@@ -313,7 +335,7 @@ namespace SurfaceFanControl.Core.Hardware
 
                 if (_keepAliveRpmActive && _activeTargetRpm > 0 && _samClient.IsDirectSamAvailable)
                 {
-                    _samClient.TrySetFanProfile(_activeSamFanProfile);
+                    _samClient.TrySetFanProfile(CurrentFanProfile());
                     _samClient.TrySetFanRpm(_activeTargetRpm);
                 }
             }
@@ -388,8 +410,7 @@ namespace SurfaceFanControl.Core.Hardware
                     ProcThrottleMaxAc = targetThrottleMaxAc,
                     ProcThrottleMaxDc = targetThrottleMaxDc,
                     OverlaySchemeGuid = stockOverlay,
-                    SamFanProfile = 2,
-                    TargetFanRpm = 0
+                    SamFanProfile = 2
                 };
                 ProfileApplied?.Invoke(stockProfile);
                 return true;
@@ -428,7 +449,7 @@ namespace SurfaceFanControl.Core.Hardware
                 if (shouldResetSam && _samClient.IsDirectSamAvailable)
                 {
                     _samClient.TrySetFanRpm(0);
-                    _samClient.TrySetFanProfile(2);
+                    _samClient.TrySetFanProfile(CurrentFanProfile());
                 }
 
                 // A profile also changed the power plan and power mode (e.g. Quiet's 99% processor

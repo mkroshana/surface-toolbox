@@ -5,6 +5,10 @@ using SurfaceFanControl.Core.Hardware;
 
 namespace SurfaceFanControl.Core.Profiles
 {
+    /// <summary>
+    /// Tracks the active power mode and forwards fan requests. The two are independent: choosing
+    /// a power mode leaves the fan speed alone, and setting a fan speed leaves the power mode alone.
+    /// </summary>
     public class ProfileManager
     {
         private readonly SurfacePowerManager _powerManager;
@@ -19,34 +23,42 @@ namespace SurfaceFanControl.Core.Profiles
 
             var quiet = CoolingProfile.CreateQuiet();
             var balanced = CoolingProfile.CreateBalanced();
-            var turbo = CoolingProfile.CreateTurbo();
+            var betterPerformance = CoolingProfile.CreateBetterPerformance();
+            var bestPerformance = CoolingProfile.CreateBestPerformance();
 
             _profiles = new Dictionary<CoolingProfileType, CoolingProfile>
             {
                 { CoolingProfileType.Quiet, quiet },
                 { CoolingProfileType.Balanced, balanced },
-                { CoolingProfileType.Turbo, turbo }
+                { CoolingProfileType.BetterPerformance, betterPerformance },
+                { CoolingProfileType.BestPerformance, bestPerformance }
             };
 
             AvailableProfiles = new List<CoolingProfile>
             {
                 quiet,
                 balanced,
-                turbo
+                betterPerformance,
+                bestPerformance
             };
 
+            // Start from the power mode Windows is actually in.
             Guid overlay = _powerManager.GetEffectiveOverlayGuid();
             if (overlay == NativePower.GUID_OVERLAY_BEST_POWER_EFFICIENCY)
             {
-                _activeProfile = _profiles[CoolingProfileType.Quiet];
+                _activeProfile = quiet;
+            }
+            else if (overlay == NativePower.GUID_OVERLAY_BETTER_PERFORMANCE)
+            {
+                _activeProfile = betterPerformance;
             }
             else if (overlay == NativePower.GUID_OVERLAY_BEST_PERFORMANCE)
             {
-                _activeProfile = _profiles[CoolingProfileType.Turbo];
+                _activeProfile = bestPerformance;
             }
             else
             {
-                _activeProfile = _profiles[CoolingProfileType.Balanced];
+                _activeProfile = balanced;
             }
 
             _powerManager.ProfileApplied += (p) =>
@@ -105,29 +117,7 @@ namespace SurfaceFanControl.Core.Profiles
 
         public bool ResetFanSpeedOnly()
         {
-            bool ok = _powerManager.ResetFanSpeedOnly();
-            if (ok && _activeProfile != null)
-            {
-                var updated = new CoolingProfile
-                {
-                    Type = _activeProfile.Type,
-                    Name = _activeProfile.Type == CoolingProfileType.Turbo
-                        ? "Turbo (Auto Fan)"
-                        : (_activeProfile.Type == CoolingProfileType.Manual ? "Manual (Auto Fan)" : _activeProfile.Name),
-                    Description = "Automatic SAM fan control active while preserving current power overlay.",
-                    IconKey = _activeProfile.IconKey,
-                    SurfaceOverlayAcIndex = _activeProfile.SurfaceOverlayAcIndex,
-                    SurfaceOverlayDcIndex = _activeProfile.SurfaceOverlayDcIndex,
-                    ProcThrottleMaxAc = _activeProfile.ProcThrottleMaxAc,
-                    ProcThrottleMaxDc = _activeProfile.ProcThrottleMaxDc,
-                    OverlaySchemeGuid = _activeProfile.OverlaySchemeGuid,
-                    SamFanProfile = _activeProfile.SamFanProfile,
-                    TargetFanRpm = 0
-                };
-                _activeProfile = updated;
-                ActiveProfileChanged?.Invoke(updated);
-            }
-            return ok;
+            return _powerManager.ResetFanSpeedOnly();
         }
     }
 }

@@ -45,7 +45,9 @@ Unlike standard PCs with SuperI/O PWM registers, modern Intel Surface devices (s
 | `0x0E` | **Set Fan Profile** | `0x00` | `05 01 01 00 0E 01 00 <uint8>` (8B; `2`=Balanced, `3`=Better, `4`=Best) | `null` (`0B`) | `SurfaceSmfClient.sys` (`RVA 0x38C74`) |
 | `0x0F` | **Set CS Fan Request** | `0x00` | `05 01 01 00 0F 01 00 <uint8>` (8B) | `null` (`0B`) | `SurfaceSmfClient.sys` (`RVA 0x384A8`) |
 
-> **Hardware Behavior Note:** From a dead stop (`0 RPM`), the Surface Pro 9 SAM firmware applies a ~4.5-second startup delay and a ~350–500 RPM/sec slew-rate filter. Because `SMF Core` can periodically re-send its computed RPM, manual/Turbo RPM overrides refresh `CID = 0x0B` on each 1-second poll cycle and restore `0 RPM` (`Auto`) on profile reset or application exit.
+> **Hardware Behavior Note:** From a dead stop (`0 RPM`), the Surface Pro 9 SAM firmware applies a ~4.5-second startup delay and a ~350–500 RPM/sec slew-rate filter. Because `SMF Core` can periodically re-send its computed RPM, a manual RPM override refreshes `CID = 0x0B` on each 1-second poll cycle and restores `0 RPM` (`Auto`) on fan reset or application exit.
+>
+> **Measured on a warm, charging Surface Pro 9 (2026-11-13):** while the firmware's own thermal control is driving the fan, `CID = 0x0B` is accepted but has no effect, above or below the current speed and even when re-sent ten times a second. `O_FAN1_ACTIVE_RPM` reads `0` in that state, so the SAM is running its own curve. The app compares the tachometer with the requested RPM and reports when a target is not being applied. Setting the SAM fan profile directly (`CID = 0x0E`) with the power mode left alone moved the fan by only about 100 RPM.
 
 ---
 
@@ -80,10 +82,12 @@ Calling `PowerSetActiveOverlayScheme(ref Guid overlayGuid)` immediately transiti
 
 | Mode | Overlay Scheme GUID | SMF `O_FAN1_PROFILE` | SMF `PL1 / PL2` |
 | :--- | :--- | :---: | :---: |
-| **Quiet / Silent** | `961cc777-2547-4f9d-8174-7d86181b8a7a` (*Best Power Efficiency* + `99% max processor state`) | `2` | `13 W / 28 W` |
-| **Balanced (Auto)** | `00000000-0000-0000-0000-000000000000` (*Recommended*) | `2` | `13 W–21 W / 28 W` |
-| **Manual Override** | `3af9b8d9-7c97-431d-ad78-34a8bfea439f` (*Better Performance*) | `3` | `28 W / 30 W` |
-| **Turbo Cooling** | `ded574b5-45a0-4f42-8737-46345c09c238` (*Best Performance*) | `4` (+ `4200 RPM` SAM override) | `30 W / 35 W` |
+| **Quiet** | `961cc777-2547-4f9d-8174-7d86181b8a7a` (*Best Power Efficiency* + `99% max processor state`) | `2` | `13 W / 28 W` |
+| **Balanced** | `00000000-0000-0000-0000-000000000000` (*Recommended*) | `2` | `13 W–21 W / 28 W` |
+| **Better Performance** | `3af9b8d9-7c97-431d-ad78-34a8bfea439f` (*Better Performance*) | `3` | `23 W–28 W / 28 W–30 W` (measured) |
+| **Best Performance** | `ded574b5-45a0-4f42-8737-46345c09c238` (*Best Performance*) | `4` | `35 W / 35 W` (measured) |
+
+**Power mode and fan speed are separate settings in the app.** Choosing a power mode sets the overlay (and Quiet's 99% processor cap) and leaves any fan speed target alone; setting a fan speed sends only the SAM RPM command and leaves the power mode alone. The fan's automatic behaviour still follows the power mode, because `SMF Core` selects the fan profile from the overlay. `PowerSetActiveOverlayScheme` changes the mode for the current power source only (AC or battery).
 
 ---
 

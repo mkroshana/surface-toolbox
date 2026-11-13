@@ -55,7 +55,8 @@ namespace SurfaceFanControl.UI.ViewModels
 
             SelectQuietCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.Quiet));
             SelectBalancedCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.Balanced));
-            SelectTurboCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.Turbo));
+            SelectBetterPerformanceCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.BetterPerformance));
+            SelectBestPerformanceCommand = new RelayCommand(_ => SetProfile(CoolingProfileType.BestPerformance));
             ApplyManualRpmCommand = new RelayCommand(_ => ApplyManualRpm());
             ResetFanOnlyCommand = new RelayCommand(_ => ResetFanOnly());
             RestoreStockCommand = new RelayCommand(_ => RestoreStock());
@@ -233,16 +234,16 @@ namespace SurfaceFanControl.UI.ViewModels
                 {
                     OnPropertyChanged(nameof(IsQuietActive));
                     OnPropertyChanged(nameof(IsBalancedActive));
-                    OnPropertyChanged(nameof(IsTurboActive));
-                    OnPropertyChanged(nameof(IsManualActive));
+                    OnPropertyChanged(nameof(IsBetterPerformanceActive));
+                    OnPropertyChanged(nameof(IsBestPerformanceActive));
                 }
             }
         }
 
         public bool IsQuietActive => ActiveProfile.Type == CoolingProfileType.Quiet;
         public bool IsBalancedActive => ActiveProfile.Type == CoolingProfileType.Balanced || ActiveProfile.Type == CoolingProfileType.StockReset;
-        public bool IsTurboActive => ActiveProfile.Type == CoolingProfileType.Turbo;
-        public bool IsManualActive => ActiveProfile.Type == CoolingProfileType.Manual;
+        public bool IsBetterPerformanceActive => ActiveProfile.Type == CoolingProfileType.BetterPerformance;
+        public bool IsBestPerformanceActive => ActiveProfile.Type == CoolingProfileType.BestPerformance;
 
         public bool IsStockRestored
         {
@@ -254,7 +255,8 @@ namespace SurfaceFanControl.UI.ViewModels
 
         public ICommand SelectQuietCommand { get; }
         public ICommand SelectBalancedCommand { get; }
-        public ICommand SelectTurboCommand { get; }
+        public ICommand SelectBetterPerformanceCommand { get; }
+        public ICommand SelectBestPerformanceCommand { get; }
         public ICommand ApplyManualRpmCommand { get; }
         public ICommand ResetFanOnlyCommand { get; }
         public ICommand RestoreStockCommand { get; }
@@ -263,47 +265,26 @@ namespace SurfaceFanControl.UI.ViewModels
 
         public ProfileManager ProfileManager => _profileManager;
 
+        // Changes the power mode only. A fan speed the user has set is left as it is.
         public void SetProfile(CoolingProfileType type)
         {
             bool ok = _profileManager.SetProfile(type);
             if (ok)
             {
-                TargetFanRpm = _powerManager.ActiveTargetRpm;
-                if (type == CoolingProfileType.Turbo)
-                {
-                    ManualSliderRpm = 4200;
-                }
-                else if (_manualSliderRpm == 0)
-                {
-                    ManualSliderRpm = 3400;
-                }
-
                 var active = _profileManager.ActiveProfile;
                 string? failure = DescribeLastFailure();
-                if (failure != null)
-                {
-                    StatusMessage = $"{active.Name} only partly applied: {failure}.";
-                }
-                else if (active.TargetFanRpm > 0 && !_powerManager.IsDirectSamAvailable)
-                {
-                    StatusMessage = $"Switched to {active.Name} (SMF Profile {active.SamFanProfile} applied; run as Admin for {active.TargetFanRpm} RPM override)";
-                }
-                else if (active.TargetFanRpm > 0)
-                {
-                    StatusMessage = $"Switched to {active.Name} — Commanding {active.TargetFanRpm} RPM via SAM";
-                }
-                else
-                {
-                    StatusMessage = $"Switched to {active.Name} (SMF Fan Profile {active.SamFanProfile})";
-                }
+                StatusMessage = failure != null
+                    ? $"{active.Name} only partly applied: {failure}."
+                    : $"Power Mode Set to {active.Name} (fan speed unchanged)";
                 IsStockRestored = false;
             }
             else
             {
-                StatusMessage = "Failed to switch profile.";
+                StatusMessage = "Failed to switch power mode.";
             }
         }
 
+        // Changes the fan speed only. The power mode is left as it is.
         public void ApplyManualRpm()
         {
             if (!_powerManager.IsDirectSamAvailable)
@@ -316,25 +297,17 @@ namespace SurfaceFanControl.UI.ViewModels
             bool ok = _profileManager.SetManualRpm(target);
             if (ok)
             {
-                ushort effectiveRpm = _profileManager.ActiveProfile.TargetFanRpm;
+                ushort effectiveRpm = _powerManager.ActiveTargetRpm;
                 ManualSliderRpm = effectiveRpm;
-                TargetFanRpm = _powerManager.ActiveTargetRpm;
-                string? failure = DescribeLastFailure();
-                if (failure != null)
-                {
-                    StatusMessage = $"{_profileManager.ActiveProfile.Name} only partly applied: {failure}.";
-                }
-                else
-                {
-                    StatusMessage = effectiveRpm > 0
-                        ? $"Manual Fan Speed Set to {effectiveRpm} RPM (SAM Direct)"
-                        : "Fan Returned to Automatic SAM Curve (0 RPM Override)";
-                }
+                TargetFanRpm = effectiveRpm;
+                StatusMessage = effectiveRpm > 0
+                    ? $"Fan Speed Set to {effectiveRpm} RPM (power mode unchanged)"
+                    : "Fan Returned to Automatic Control (power mode unchanged)";
                 IsStockRestored = false;
             }
             else
             {
-                StatusMessage = "Failed to apply manual fan speed.";
+                StatusMessage = "Failed to apply fan speed.";
             }
         }
 

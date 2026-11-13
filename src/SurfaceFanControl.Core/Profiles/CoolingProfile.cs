@@ -7,11 +7,16 @@ namespace SurfaceFanControl.Core.Profiles
     {
         Quiet,
         Balanced,
-        Turbo,
-        Manual,
+        BetterPerformance,
+        BestPerformance,
         StockReset
     }
 
+    /// <summary>
+    /// A power mode: the Windows power-mode overlay plus the power-plan values that go with it.
+    /// Fan speed is a separate setting (see <c>SurfacePowerManager.SetManualFanRpm</c>) and is
+    /// not part of a profile, so applying one never changes a fan speed the user has set.
+    /// </summary>
     public class CoolingProfile
     {
         public CoolingProfileType Type { get; set; }
@@ -23,24 +28,24 @@ namespace SurfaceFanControl.Core.Profiles
         public uint ProcThrottleMaxAc { get; set; }
         public uint ProcThrottleMaxDc { get; set; }
         public Guid OverlaySchemeGuid { get; set; } = NativePower.GUID_OVERLAY_BALANCED;
+
+        /// <summary>The fan profile SMF selects for this power mode (2 = Balanced, 3 = Better, 4 = Best).</summary>
         public byte SamFanProfile { get; set; } = 2;
-        public ushort TargetFanRpm { get; set; } = 0;
 
         public static CoolingProfile CreateQuiet()
         {
             return new CoolingProfile
             {
                 Type = CoolingProfileType.Quiet,
-                Name = "Quiet / Silent",
-                Description = "Best Power Efficiency overlay (13W PL1 / 28W PL2) with passive cooling priority.",
+                Name = "Quiet",
+                Description = "Best Power Efficiency mode with the processor capped at 99% (turbo boost off).",
                 IconKey = "Quiet",
-                SurfaceOverlayAcIndex = 1,
-                SurfaceOverlayDcIndex = 2,
+                SurfaceOverlayAcIndex = NativePower.SURFACE_OVERLAY_BALANCED_AC,
+                SurfaceOverlayDcIndex = NativePower.SURFACE_OVERLAY_BALANCED_DC,
                 ProcThrottleMaxAc = 99,
                 ProcThrottleMaxDc = 99,
                 OverlaySchemeGuid = NativePower.GUID_OVERLAY_BEST_POWER_EFFICIENCY,
-                SamFanProfile = 2,
-                TargetFanRpm = 0
+                SamFanProfile = 2
             };
         }
 
@@ -50,58 +55,48 @@ namespace SurfaceFanControl.Core.Profiles
             {
                 Type = CoolingProfileType.Balanced,
                 Name = "Balanced",
-                Description = "Surface factory default curve (Recommended overlay, automatic SAM fan control).",
+                Description = "Windows Recommended mode, the Surface factory default.",
                 IconKey = "Balanced",
-                SurfaceOverlayAcIndex = 1,
-                SurfaceOverlayDcIndex = 2,
+                SurfaceOverlayAcIndex = NativePower.SURFACE_OVERLAY_BALANCED_AC,
+                SurfaceOverlayDcIndex = NativePower.SURFACE_OVERLAY_BALANCED_DC,
                 ProcThrottleMaxAc = 100,
                 ProcThrottleMaxDc = 100,
                 OverlaySchemeGuid = NativePower.GUID_OVERLAY_BALANCED,
-                SamFanProfile = 2,
-                TargetFanRpm = 0
+                SamFanProfile = 2
             };
         }
 
-        public static CoolingProfile CreateTurbo()
+        public static CoolingProfile CreateBetterPerformance()
         {
             return new CoolingProfile
             {
-                Type = CoolingProfileType.Turbo,
-                Name = "Turbo Cooling",
-                Description = "Best Performance overlay (30W PL1 / 35W PL2) + active 4200 RPM direct SAM fan cooling.",
-                IconKey = "Turbo",
-                SurfaceOverlayAcIndex = 5,
-                SurfaceOverlayDcIndex = 6,
+                Type = CoolingProfileType.BetterPerformance,
+                Name = "Better Performance",
+                Description = "Windows Better Performance mode, one step above Recommended.",
+                IconKey = "BetterPerformance",
+                SurfaceOverlayAcIndex = NativePower.SURFACE_OVERLAY_HIGH_PERF_AC,
+                SurfaceOverlayDcIndex = NativePower.SURFACE_OVERLAY_HIGH_PERF_DC,
+                ProcThrottleMaxAc = 100,
+                ProcThrottleMaxDc = 100,
+                OverlaySchemeGuid = NativePower.GUID_OVERLAY_BETTER_PERFORMANCE,
+                SamFanProfile = 3
+            };
+        }
+
+        public static CoolingProfile CreateBestPerformance()
+        {
+            return new CoolingProfile
+            {
+                Type = CoolingProfileType.BestPerformance,
+                Name = "Best Performance",
+                Description = "Windows Best Performance mode, with the highest power limits.",
+                IconKey = "BestPerformance",
+                SurfaceOverlayAcIndex = NativePower.SURFACE_OVERLAY_MAX_PERF_AC,
+                SurfaceOverlayDcIndex = NativePower.SURFACE_OVERLAY_MAX_PERF_DC,
                 ProcThrottleMaxAc = 100,
                 ProcThrottleMaxDc = 100,
                 OverlaySchemeGuid = NativePower.GUID_OVERLAY_BEST_PERFORMANCE,
-                SamFanProfile = 4,
-                TargetFanRpm = 4200
-            };
-        }
-
-        public static CoolingProfile CreateManual(ushort targetRpm)
-        {
-            ushort effectiveRpm = targetRpm == 0
-                ? (ushort)0
-                : Math.Clamp(targetRpm, SurfaceSamClient.MinManualFanRpm, SurfaceSamClient.MaxManualFanRpm);
-            bool quietOverlay = effectiveRpm > 0 && effectiveRpm <= 2800;
-
-            return new CoolingProfile
-            {
-                Type = CoolingProfileType.Manual,
-                Name = effectiveRpm > 0 ? $"Manual ({effectiveRpm} RPM)" : "Manual (Auto / 0 RPM)",
-                Description = $"Direct SAM hardware fan override at {effectiveRpm} RPM.",
-                IconKey = "Manual",
-                SurfaceOverlayAcIndex = quietOverlay ? 1u : 2u,
-                SurfaceOverlayDcIndex = quietOverlay ? 1u : 2u,
-                ProcThrottleMaxAc = 100,
-                ProcThrottleMaxDc = 100,
-                OverlaySchemeGuid = quietOverlay
-                    ? NativePower.GUID_OVERLAY_BEST_POWER_EFFICIENCY
-                    : NativePower.GUID_OVERLAY_BALANCED,
-                SamFanProfile = 2,
-                TargetFanRpm = effectiveRpm
+                SamFanProfile = 4
             };
         }
     }

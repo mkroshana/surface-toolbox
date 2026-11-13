@@ -64,20 +64,20 @@ try {
     }
     Write-Host "[OK] Baseline capture and backup passed." -ForegroundColor Green
 
-    # 3. Test Profile Switching (Turbo -> Quiet -> Stock Restore)
+    # 3. Test Power Mode Switching (Best Performance -> Quiet -> Stock Restore)
     Write-Host ""
     Write-Host "--- Test 3: Profile Switching & Live SMF Verification ---" -ForegroundColor Yellow
     $monitor = [SurfaceFanControl.Core.Hardware.SurfaceThermalMonitor]::new($powerManager, 10000)
 
-    # Test Turbo Mode
-    Write-Host "  Applying Turbo Cooling Profile..."
-    $turboProfile = [SurfaceFanControl.Core.Profiles.CoolingProfile]::CreateTurbo()
-    $okTurbo = $powerManager.ApplyProfile($turboProfile)
-    if (-not $okTurbo) { Write-Error "Failed: Could not apply Turbo profile." }
+    # Test Best Performance Mode
+    Write-Host "  Applying Best Performance Power Mode..."
+    $bestProfile = [SurfaceFanControl.Core.Profiles.CoolingProfile]::CreateBestPerformance()
+    $okBest = $powerManager.ApplyProfile($bestProfile)
+    if (-not $okBest) { Write-Error "Failed: Could not apply Best Performance power mode." }
     Start-Sleep -Milliseconds 350
-    $turboSnap = $monitor.CaptureSnapshot()
-    Write-Host "  Verified SMF State in Turbo: FanProfile=$($turboSnap.SmfFanProfile) (Expected: 4), PL1=$($turboSnap.Pl1Watts)W, PL2=$($turboSnap.Pl2Watts)W" -ForegroundColor Green
-    if ($turboSnap.SmfFanProfile -ne 4) { Write-Error "Failed: Expected SMF FanProfile 4 in Turbo, got $($turboSnap.SmfFanProfile)" }
+    $bestSnap = $monitor.CaptureSnapshot()
+    Write-Host "  Verified SMF State in Best Performance: FanProfile=$($bestSnap.SmfFanProfile) (Expected: 4), PL1=$($bestSnap.Pl1Watts)W, PL2=$($bestSnap.Pl2Watts)W" -ForegroundColor Green
+    if ($bestSnap.SmfFanProfile -ne 4) { Write-Error "Failed: Expected SMF FanProfile 4 in Best Performance, got $($bestSnap.SmfFanProfile)" }
 
     # Test Quiet Mode
     Write-Host "  Applying Quiet Profile..."
@@ -98,7 +98,24 @@ try {
     Write-Host "  Verified Restored SMF State: FanProfile=$($restoredSnap.SmfFanProfile), PL1=$($restoredSnap.Pl1Watts)W, PL2=$($restoredSnap.Pl2Watts)W" -ForegroundColor Green
     if ($powerManager.ActiveTargetRpm -ne 0) { Write-Host "[FAIL] Expected ActiveTargetRpm=0 after stock restore, got $($powerManager.ActiveTargetRpm)" -ForegroundColor Red; exit 1 }
     if ($restoredSnap.SmfFanProfile -ne 2) { Write-Host "[FAIL] Expected SMF FanProfile=2 after stock restore, got $($restoredSnap.SmfFanProfile)" -ForegroundColor Red; exit 1 }
-    Write-Host "[OK] Profile switching and stock restore passed." -ForegroundColor Green
+    Write-Host "[OK] Power mode switching and stock restore passed." -ForegroundColor Green
+
+    # 3b. Power mode and fan speed are independent settings
+    Write-Host ""
+    Write-Host "--- Test 3b: Power Mode and Fan Speed Independence ---" -ForegroundColor Yellow
+    if ($powerManager.IsDirectSamAvailable) {
+        $overlayBefore = $powerManager.GetEffectiveOverlayGuid()
+        if (-not $powerManager.SetManualFanRpm(3000)) { Write-Host "[FAIL] Could not set a fan speed." -ForegroundColor Red; exit 1 }
+        if ($powerManager.GetEffectiveOverlayGuid() -ne $overlayBefore) { Write-Host "[FAIL] Setting a fan speed changed the power mode." -ForegroundColor Red; exit 1 }
+        $betterProfile = [SurfaceFanControl.Core.Profiles.CoolingProfile]::CreateBetterPerformance()
+        if (-not $powerManager.ApplyProfile($betterProfile)) { Write-Host "[FAIL] Could not apply Better Performance power mode." -ForegroundColor Red; exit 1 }
+        if ($powerManager.ActiveTargetRpm -ne 3000) { Write-Host "[FAIL] Changing the power mode dropped the fan speed target (got $($powerManager.ActiveTargetRpm))." -ForegroundColor Red; exit 1 }
+        if (-not $powerManager.ResetFanSpeedOnly()) { Write-Host "[FAIL] Could not return the fan to automatic control." -ForegroundColor Red; exit 1 }
+        if ($powerManager.GetEffectiveOverlayGuid() -ne $betterProfile.OverlaySchemeGuid) { Write-Host "[FAIL] Resetting the fan changed the power mode." -ForegroundColor Red; exit 1 }
+        Write-Host "[OK] Fan speed and power mode change independently." -ForegroundColor Green
+    } else {
+        Write-Host "[SKIP] Direct SAM access unavailable (run as Administrator)." -ForegroundColor Yellow
+    }
 
     # 4. Test Thermal & Fan Telemetry
     Write-Host ""
