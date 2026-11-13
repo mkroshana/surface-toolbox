@@ -91,7 +91,7 @@ Calling `PowerSetActiveOverlayScheme(ref Guid overlayGuid)` immediately transiti
 
 - `src/SurfaceFanControl.Core/Hardware/SurfaceSamClient.cs` — Direct `MSHW0084` (`0x04001C48`) fan RPM/profile control and `SMF Core` (`0x1FAA000C`) telemetry client.
 - `src/SurfaceFanControl.Core/Hardware/NativePower.cs` — `powrprof.dll` P/Invoke declarations (`PowerGetEffectiveOverlayScheme`, `PowerSetActiveOverlayScheme`, legacy scheme APIs).
-- `src/SurfaceFanControl.Core/Hardware/SurfacePowerManager.cs` — Coordinates overlay switching, direct SAM fan commands, periodic RPM keep-alive, baseline backup (`%LOCALAPPDATA%\SurfaceFanControl\stock_settings_backup.json`), and, on disposal, restoration of the stock power baseline (when a profile was applied this session) and `0 RPM` automatic fan control.
+- `src/SurfaceFanControl.Core/Hardware/SurfacePowerManager.cs` — Coordinates overlay switching, direct SAM fan commands, periodic RPM keep-alive, baseline backup (`%LOCALAPPDATA%\SurfaceFanControl\stock_settings_backup.json`), and, on disposal, restoration of the power settings as they were before the app changed them (`session_baseline.json` in the same folder, kept only while changes are outstanding) and `0 RPM` automatic fan control.
 - `src/SurfaceFanControl.Core/Hardware/SurfaceThermalMonitor.cs` — 1-second hardware polling loop reading ACPI thermal zones (`\_SB.TZ01`..`\_SB.TZ0B`), live SAM tachometer RPM, SMF fan profile, and `PL1`/`PL2` wattages.
 - `src/SurfaceFanControl.UI/` — WPF dashboard (`MainWindow.xaml`, `MainViewModel.cs`) and system tray integration (`TrayIconManager.cs`). Configured with `requireAdministrator` in `app.manifest`.
 

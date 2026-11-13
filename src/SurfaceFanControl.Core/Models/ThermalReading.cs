@@ -52,6 +52,25 @@ namespace SurfaceFanControl.Core.Models
         }
     }
 
+    /// <summary>How the measured fan speed relates to the RPM the app asked the SAM for.</summary>
+    public enum FanTargetState
+    {
+        /// <summary>No RPM requested; the firmware's automatic curve is in charge.</summary>
+        Auto,
+
+        /// <summary>An RPM was requested recently and the fan may still be ramping.</summary>
+        Settling,
+
+        /// <summary>The fan is running at the requested RPM.</summary>
+        Applied,
+
+        /// <summary>The firmware is holding the fan faster than the requested RPM.</summary>
+        HeldAboveTarget,
+
+        /// <summary>The fan has not moved to the requested RPM; the firmware is ignoring it.</summary>
+        NotApplied
+    }
+
     public class SystemThermalSnapshot
     {
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
@@ -64,6 +83,7 @@ namespace SurfaceFanControl.Core.Models
         public int BatteryPercentage { get; set; }
         public int FanRpm { get; set; }
         public int TargetFanRpm { get; set; }
+        public FanTargetState FanTargetState { get; set; }
         public int SmfFanProfile { get; set; } = 2;
         public double Pl1Watts { get; set; }
         public double Pl2Watts { get; set; }

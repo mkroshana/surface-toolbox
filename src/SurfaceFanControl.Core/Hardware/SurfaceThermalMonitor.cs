@@ -136,6 +136,12 @@ namespace SurfaceFanControl.Core.Hardware
             if (_powerManager.SamClient.TryReadFanRpm(out int fanRpm))
             {
                 snapshot.FanRpm = fanRpm;
+                snapshot.FanTargetState = _powerManager.EvaluateFanTarget(fanRpm);
+            }
+            else if (snapshot.TargetFanRpm > 0)
+            {
+                // Without a reading there is nothing to compare the target against yet.
+                snapshot.FanTargetState = FanTargetState.Settling;
             }
 
             if (_powerManager.SamClient.TryReadSmfFanProfile(out int smfProf))

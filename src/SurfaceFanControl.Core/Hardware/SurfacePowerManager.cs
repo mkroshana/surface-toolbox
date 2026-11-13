@@ -9,9 +9,18 @@ namespace SurfaceFanControl.Core.Hardware
 {
     public class SurfacePowerManager : IDisposable
     {
+        /// <summary>How far the measured fan speed may sit from the requested RPM and still count as applied.</summary>
+        public const int FanTargetToleranceRpm = 350;
+
+        // Worst case from a stopped fan: ~4.5 s firmware start delay plus a ~350 RPM/s ramp to 4800 RPM.
+        private const long FanTargetSettleMs = 20000;
+
         private Guid _activeSchemeGuid;
         private StockSettingsBackup _stockBackup = new();
+        private SessionBaseline? _sessionBaseline;
+        private long _targetSetTickMs;
         private readonly string _backupFilePath;
+        private readonly string _sessionBaselinePath;
         private readonly SurfaceSamClient _samClient;
         private readonly object _fanLock = new();
         private volatile ushort _activeTargetRpm;
@@ -31,8 +40,10 @@ namespace SurfaceFanControl.Core.Hardware
             string appDir = Path.Combine(appData, "SurfaceFanControl");
             Directory.CreateDirectory(appDir);
             _backupFilePath = Path.Combine(appDir, "stock_settings_backup.json");
+            _sessionBaselinePath = Path.Combine(appDir, "session_baseline.json");
 
             Initialize();
+            LoadPendingSessionBaseline();
         }
 
         public SurfaceSamClient SamClient => _samClient;
@@ -42,6 +53,38 @@ namespace SurfaceFanControl.Core.Hardware
         public ushort ActiveTargetRpm => _activeTargetRpm;
 
         public bool IsDirectSamAvailable => _samClient.IsDirectSamAvailable;
+
+        /// <summary>
+        /// True when the most recent profile apply or stock restore could not switch the
+        /// Windows power mode overlay.
+        /// </summary>
+        public bool LastOverlayFailed { get; private set; }
+
+        /// <summary>
+        /// True when the most recent profile apply or stock restore reached the SAM but its
+        /// fan RPM command failed.
+        /// </summary>
+        public bool LastFanCommandFailed { get; private set; }
+
+        /// <summary>
+        /// Compares the measured fan speed with the RPM last requested from the SAM. The SAM accepts
+        /// an RPM command even when its own thermal control then ignores it, so the command's result
+        /// alone does not show whether the fan is following the request.
+        /// </summary>
+        public FanTargetState EvaluateFanTarget(int measuredRpm)
+        {
+            int target = _activeTargetRpm;
+            if (target <= 0)
+                return FanTargetState.Auto;
+
+            if (Math.Abs(measuredRpm - target) <= FanTargetToleranceRpm)
+                return FanTargetState.Applied;
+
+            if (Environment.TickCount64 - Interlocked.Read(ref _targetSetTickMs) < FanTargetSettleMs)
+                return FanTargetState.Settling;
+
+            return measuredRpm > target ? FanTargetState.HeldAboveTarget : FanTargetState.NotApplied;
+        }
 
         public Guid GetEffectiveOverlayGuid()
         {
@@ -166,6 +209,7 @@ namespace SurfaceFanControl.Core.Hardware
             Guid procThrottleMax = NativePower.GUID_PROCTHROTTLEMAX;
 
             // 1. Write legacy Surface Overlay AC / DC values & Processor Max Throttle
+            CaptureSessionBaseline(scheme);
             _powerModified = true;
             NativePower.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref overlaySubgroup, ref overlaySetting, profile.SurfaceOverlayAcIndex);
             NativePower.PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref overlaySubgroup, ref overlaySetting, profile.SurfaceOverlayDcIndex);
@@ -176,6 +220,8 @@ namespace SurfaceFanControl.Core.Hardware
             // 2. Set Windows 11 Modern Standby Overlay Scheme (updates SMF Core I_SLIDER, O_FAN1_PROFILE, and PL1/PL2)
             Guid overlayGuid = profile.OverlaySchemeGuid;
             uint overlayResult = NativePower.PowerSetActiveOverlayScheme(ref overlayGuid);
+            LastOverlayFailed = overlayResult != NativePower.ERROR_SUCCESS;
+            LastFanCommandFailed = false;
 
             // 3. Direct SAM hardware fan control (when running elevated)
             bool samApplied = false;
@@ -188,6 +234,7 @@ namespace SurfaceFanControl.Core.Hardware
                 {
                     bool profileSet = _samClient.TrySetFanProfile(profile.SamFanProfile);
                     bool rpmSet = _samClient.TrySetFanRpm(profile.TargetFanRpm);
+                    LastFanCommandFailed = !rpmSet;
                     samApplied = profileSet || rpmSet;
                     if (samApplied)
                     {
@@ -196,6 +243,7 @@ namespace SurfaceFanControl.Core.Hardware
 
                     if (rpmSet && profile.TargetFanRpm > 0)
                     {
+                        Interlocked.Exchange(ref _targetSetTickMs, Environment.TickCount64);
                         _activeTargetRpm = profile.TargetFanRpm;
                         _activeSamFanProfile = profile.SamFanProfile;
                         _keepAliveRpmActive = true;
@@ -308,7 +356,12 @@ namespace SurfaceFanControl.Core.Hardware
                 ? parsedOverlay
                 : NativePower.GUID_OVERLAY_BALANCED;
             uint overlayResult = NativePower.PowerSetActiveOverlayScheme(ref stockOverlay);
-            _powerModified = false;
+
+            // An explicit reset to stock replaces whatever was there before the session, so
+            // there is nothing left for the exit path to put back.
+            ClearSessionBaseline();
+            LastOverlayFailed = overlayResult != NativePower.ERROR_SUCCESS;
+            LastFanCommandFailed = false;
 
             lock (_fanLock)
             {
@@ -316,7 +369,7 @@ namespace SurfaceFanControl.Core.Hardware
                 _activeTargetRpm = 0;
                 if (_samClient.IsDirectSamAvailable)
                 {
-                    _samClient.TrySetFanRpm(0);
+                    LastFanCommandFailed = !_samClient.TrySetFanRpm(0);
                     _samClient.TrySetFanProfile(2);
                 }
                 _samModified = false;
@@ -365,15 +418,6 @@ namespace SurfaceFanControl.Core.Hardware
             lock (_fanLock)
             {
                 if (_disposed) return;
-
-                // A profile applied this session also changed the power plan and overlay
-                // (e.g. Quiet's 99% processor cap). Put the stock baseline back so those do
-                // not outlive the app; this also returns the fan to automatic control.
-                if (_powerModified)
-                {
-                    RestoreStockSettings();
-                }
-
                 _disposed = true;
 
                 bool shouldResetSam = _keepAliveRpmActive || _samModified;
@@ -387,8 +431,156 @@ namespace SurfaceFanControl.Core.Hardware
                     _samClient.TrySetFanProfile(2);
                 }
 
+                // A profile also changed the power plan and power mode (e.g. Quiet's 99% processor
+                // cap). Put those back to what they were before the app touched them so they do
+                // not outlive it. Done after the fan reset so SMF re-sends its own fan profile.
+                if (_powerModified)
+                {
+                    RestoreSessionBaseline();
+                }
+
                 _samClient.Dispose();
             }
+        }
+
+        private static bool IsOnAcPower()
+        {
+            return !NativePower.GetSystemPowerStatus(out var status) || status.ACLineStatus == 1;
+        }
+
+        // A session baseline still on disk means the previous run changed power settings and
+        // ended without putting them back (crash or forced kill). Adopt it, so this run's exit
+        // restores the real earlier state rather than the leftovers of that run.
+        private void LoadPendingSessionBaseline()
+        {
+            try
+            {
+                if (!File.Exists(_sessionBaselinePath))
+                    return;
+
+                var loaded = JsonSerializer.Deserialize<SessionBaseline>(File.ReadAllText(_sessionBaselinePath));
+                if (loaded != null)
+                {
+                    _sessionBaseline = loaded;
+                    _powerModified = true;
+
+                    // That run may also have left a fan RPM override behind, so make this
+                    // run's exit return the fan to automatic control as well.
+                    _samModified = true;
+                }
+            }
+            catch
+            {
+                // Unreadable file: a fresh baseline is captured on the first change instead.
+            }
+        }
+
+        // Records the settings a profile is about to overwrite, the first time each is touched.
+        private void CaptureSessionBaseline(Guid scheme)
+        {
+            bool changed = false;
+
+            if (_sessionBaseline == null)
+            {
+                Guid overlaySubgroup = NativePower.GUID_SURFACE_OVERLAY_SUBGROUP;
+                Guid overlaySetting = NativePower.GUID_SURFACE_OVERLAY_SETTING;
+                Guid procSubgroup = NativePower.GUID_PROCESSOR_SUBGROUP;
+                Guid procThrottleMax = NativePower.GUID_PROCTHROTTLEMAX;
+
+                var baseline = new SessionBaseline { SchemeGuid = scheme.ToString() };
+
+                if (NativePower.PowerReadACValueIndex(IntPtr.Zero, ref scheme, ref overlaySubgroup, ref overlaySetting, out uint overlayAc) == NativePower.ERROR_SUCCESS)
+                    baseline.SurfaceOverlayAcIndex = overlayAc;
+                if (NativePower.PowerReadDCValueIndex(IntPtr.Zero, ref scheme, ref overlaySubgroup, ref overlaySetting, out uint overlayDc) == NativePower.ERROR_SUCCESS)
+                    baseline.SurfaceOverlayDcIndex = overlayDc;
+                if (NativePower.PowerReadACValueIndex(IntPtr.Zero, ref scheme, ref procSubgroup, ref procThrottleMax, out uint throttleAc) == NativePower.ERROR_SUCCESS)
+                    baseline.ProcThrottleMaxAc = throttleAc;
+                if (NativePower.PowerReadDCValueIndex(IntPtr.Zero, ref scheme, ref procSubgroup, ref procThrottleMax, out uint throttleDc) == NativePower.ERROR_SUCCESS)
+                    baseline.ProcThrottleMaxDc = throttleDc;
+
+                _sessionBaseline = baseline;
+                changed = true;
+            }
+
+            // PowerSetActiveOverlayScheme only changes the power mode of the current power source,
+            // so the mode is recorded per source, the first time the app is about to change it.
+            if (IsOnAcPower())
+            {
+                if (_sessionBaseline.AcOverlayGuid == null)
+                {
+                    _sessionBaseline.AcOverlayGuid = GetEffectiveOverlayGuid().ToString();
+                    changed = true;
+                }
+            }
+            else if (_sessionBaseline.DcOverlayGuid == null)
+            {
+                _sessionBaseline.DcOverlayGuid = GetEffectiveOverlayGuid().ToString();
+                changed = true;
+            }
+
+            if (changed)
+            {
+                try
+                {
+                    string json = JsonSerializer.Serialize(_sessionBaseline, new JsonSerializerOptions { WriteIndented = true });
+                    File.WriteAllText(_sessionBaselinePath, json);
+                }
+                catch { }
+            }
+        }
+
+        // Puts back the power-plan values and the power mode recorded before the app changed them.
+        // Only the current power source's mode can be set; the other source keeps what it has.
+        private void RestoreSessionBaseline()
+        {
+            SessionBaseline? baseline = _sessionBaseline;
+            if (baseline == null)
+            {
+                _powerModified = false;
+                return;
+            }
+
+            RefreshActiveScheme();
+            Guid scheme = Guid.TryParse(baseline.SchemeGuid, out Guid parsedScheme) && parsedScheme != Guid.Empty
+                ? parsedScheme
+                : _activeSchemeGuid;
+            Guid overlaySubgroup = NativePower.GUID_SURFACE_OVERLAY_SUBGROUP;
+            Guid overlaySetting = NativePower.GUID_SURFACE_OVERLAY_SETTING;
+            Guid procSubgroup = NativePower.GUID_PROCESSOR_SUBGROUP;
+            Guid procThrottleMax = NativePower.GUID_PROCTHROTTLEMAX;
+
+            if (baseline.SurfaceOverlayAcIndex is uint overlayAc)
+                NativePower.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref overlaySubgroup, ref overlaySetting, overlayAc);
+            if (baseline.SurfaceOverlayDcIndex is uint overlayDc)
+                NativePower.PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref overlaySubgroup, ref overlaySetting, overlayDc);
+            if (baseline.ProcThrottleMaxAc is uint throttleAc)
+                NativePower.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref procSubgroup, ref procThrottleMax, throttleAc);
+            if (baseline.ProcThrottleMaxDc is uint throttleDc)
+                NativePower.PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref procSubgroup, ref procThrottleMax, throttleDc);
+
+            // Re-activate the scheme that is active now so the values take effect, without
+            // switching the user back to a different plan.
+            Guid active = _activeSchemeGuid;
+            NativePower.PowerSetActiveScheme(IntPtr.Zero, ref active);
+
+            string? savedOverlay = IsOnAcPower() ? baseline.AcOverlayGuid : baseline.DcOverlayGuid;
+            if (Guid.TryParse(savedOverlay, out Guid overlay))
+            {
+                NativePower.PowerSetActiveOverlayScheme(ref overlay);
+            }
+
+            ClearSessionBaseline();
+        }
+
+        private void ClearSessionBaseline()
+        {
+            _sessionBaseline = null;
+            _powerModified = false;
+            try
+            {
+                File.Delete(_sessionBaselinePath);
+            }
+            catch { }
         }
     }
 }

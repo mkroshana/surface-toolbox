@@ -26,6 +26,7 @@ namespace SurfaceFanControl.UI.ViewModels
         private int _targetFanRpm;
         private int _manualSliderRpm = 3400;
         private int _smfFanProfile = 2;
+        private FanTargetState _fanTargetState;
         private double _pl1Watts = 13;
         private double _pl2Watts = 28;
         private bool _isDirectSamAvailable;
@@ -125,9 +126,12 @@ namespace SurfaceFanControl.UI.ViewModels
         }
 
         public string FanStateSubtitle => _isDirectSamAvailable && _targetFanRpm > 0
-            ? (_currentFanRpm > _targetFanRpm + 350
-                ? $"Target {_targetFanRpm} RPM (EC Thermal Floor)"
-                : $"Target {_targetFanRpm} RPM (SAM Direct)")
+            ? _fanTargetState switch
+            {
+                FanTargetState.HeldAboveTarget => $"Target {_targetFanRpm} RPM (EC Thermal Floor)",
+                FanTargetState.NotApplied => $"Target {_targetFanRpm} RPM (Not Applied)",
+                _ => $"Target {_targetFanRpm} RPM (SAM Direct)"
+            }
             : $"Auto Curve (SMF Profile {_smfFanProfile})";
 
         public int ManualSliderRpm
@@ -275,7 +279,12 @@ namespace SurfaceFanControl.UI.ViewModels
                 }
 
                 var active = _profileManager.ActiveProfile;
-                if (active.TargetFanRpm > 0 && !_powerManager.IsDirectSamAvailable)
+                string? failure = DescribeLastFailure();
+                if (failure != null)
+                {
+                    StatusMessage = $"{active.Name} only partly applied: {failure}.";
+                }
+                else if (active.TargetFanRpm > 0 && !_powerManager.IsDirectSamAvailable)
                 {
                     StatusMessage = $"Switched to {active.Name} (SMF Profile {active.SamFanProfile} applied; run as Admin for {active.TargetFanRpm} RPM override)";
                 }
@@ -310,9 +319,17 @@ namespace SurfaceFanControl.UI.ViewModels
                 ushort effectiveRpm = _profileManager.ActiveProfile.TargetFanRpm;
                 ManualSliderRpm = effectiveRpm;
                 TargetFanRpm = _powerManager.ActiveTargetRpm;
-                StatusMessage = effectiveRpm > 0
-                    ? $"Manual Fan Speed Set to {effectiveRpm} RPM (SAM Direct)"
-                    : "Fan Returned to Automatic SAM Curve (0 RPM Override)";
+                string? failure = DescribeLastFailure();
+                if (failure != null)
+                {
+                    StatusMessage = $"{_profileManager.ActiveProfile.Name} only partly applied: {failure}.";
+                }
+                else
+                {
+                    StatusMessage = effectiveRpm > 0
+                        ? $"Manual Fan Speed Set to {effectiveRpm} RPM (SAM Direct)"
+                        : "Fan Returned to Automatic SAM Curve (0 RPM Override)";
+                }
                 IsStockRestored = false;
             }
             else
@@ -364,12 +381,51 @@ namespace SurfaceFanControl.UI.ViewModels
                 {
                     ManualSliderRpm = 3400;
                 }
-                StatusMessage = "OEM Stock Settings & Automatic SAM Fan Curve Restored";
+                string? failure = DescribeLastFailure();
+                StatusMessage = failure != null
+                    ? $"Stock restore only partly applied: {failure}."
+                    : "OEM Stock Settings & Automatic SAM Fan Curve Restored";
                 IsStockRestored = true;
             }
             else
             {
                 StatusMessage = "Failed to restore stock settings.";
+            }
+        }
+
+        // Says what the last profile apply or stock restore could not do, or null when every
+        // step succeeded, so the status line never reports a clean success after a failure.
+        private string? DescribeLastFailure()
+        {
+            bool overlayFailed = _powerManager.LastOverlayFailed;
+            bool fanFailed = _powerManager.LastFanCommandFailed;
+
+            if (overlayFailed && fanFailed)
+                return "the Windows power mode and the SAM fan command both failed";
+            if (overlayFailed)
+                return "the Windows power mode could not be changed";
+            if (fanFailed)
+                return "the SAM fan command failed";
+            return null;
+        }
+
+        // The SAM accepts an RPM command even when its own thermal control then ignores it, so the
+        // measured speed is what shows whether a target took. Say so once when it did not, rather
+        // than leaving the earlier "set to N RPM" message standing.
+        private void UpdateFanTargetState(FanTargetState state)
+        {
+            if (state == _fanTargetState) return;
+
+            _fanTargetState = state;
+            OnPropertyChanged(nameof(FanStateSubtitle));
+
+            if (state == FanTargetState.NotApplied)
+            {
+                StatusMessage = $"Firmware is not applying the {_targetFanRpm} RPM target; the fan is at {_currentFanRpm} RPM under its own control.";
+            }
+            else if (state == FanTargetState.HeldAboveTarget)
+            {
+                StatusMessage = $"Firmware is holding the fan at {_currentFanRpm} RPM, above the {_targetFanRpm} RPM target.";
             }
         }
 
@@ -387,6 +443,7 @@ namespace SurfaceFanControl.UI.ViewModels
                 CpuPerformance = snapshot.CpuPerformancePercent;
                 CurrentFanRpm = snapshot.FanRpm;
                 TargetFanRpm = snapshot.TargetFanRpm;
+                UpdateFanTargetState(snapshot.FanTargetState);
                 SmfFanProfile = snapshot.SmfFanProfile;
                 Pl1Watts = snapshot.Pl1Watts;
                 Pl2Watts = snapshot.Pl2Watts;
